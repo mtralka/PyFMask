@@ -4,8 +4,8 @@ from typing import Dict
 from typing import Optional
 from typing import Union
 
-from pyfmask.auxillary_data_extractor.data_extractor import extract_aux_data
-from pyfmask.auxillary_data_extractor.types import AuxTypes
+from pyfmask.extractors.auxillary_data import extract_aux_data
+from pyfmask.extractors.auxillary_data import AuxTypes
 from pyfmask.platforms.landsat8 import Landsat8
 from pyfmask.utils.classes import SensorData, DEMData, GSWOData
 

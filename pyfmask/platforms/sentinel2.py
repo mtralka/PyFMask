@@ -13,7 +13,7 @@ import numpy as np
 from pyfmask.utils.classes import SensorData
 
 # from pyfmask.utils.classes import SupportedSensors
-from pyfmask.utils.metadata import extract_metadata
+from pyfmask.extractors.metadata import extract_metadata
 from pyfmask.utils.raster_utils import NO_DATA
 
 
