@@ -1,11 +1,13 @@
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from typing import Dict
 from typing import Optional
 from typing import Union
 
+from pyfmask.auxillary_data_extractor.data_extractor import extract_aux_data
+from pyfmask.auxillary_data_extractor.types import AuxTypes
 from pyfmask.platforms.landsat8 import Landsat8
-from pyfmask.utils.classes import SensorData
+from pyfmask.utils.classes import SensorData, DEMData, GSWOData
 
 
 class fmask:
@@ -46,21 +48,46 @@ class fmask:
         self.dem_nodata: Union[float, int] = dem_nodata
         self.gswo_nodata: Union[float, int] = gswo_nodata
 
-        self.data: Optional[SensorData]
+        self.platform_data: SensorData
+        self.dem_data: Optional[DEMData]
+        self.gwso_data: Optional[GSWOData]
 
-    def run(self):
+    def run(self) -> None:
 
-        self.data: SensorData = self.extract_platform_data()
+        self.platform_data = self.extract_platform_data()
 
         self.temp_dir: Path = self._create_temp_directory()
 
-        self.aux_data = self.extract_aux_data()
+        aux_data_kwargs: Dict[str, Any] = {
+            "projection_reference": self.platform_data.projection_reference,
+            "x_size": self.platform_data.x_size,
+            "y_size": self.platform_data.y_size,
+            "geo_transform": self.platform_data.geo_transform,
+            "out_resolution": self.platform_data.out_resolution,
+            "scene_id": self.platform_data.scene_id,
+        }
 
-        # extract data based on platform
+        dem_data = extract_aux_data(
+            aux_path=self.dem_path,
+            aux_type=AuxTypes.DEM,
+            no_data=self.dem_nodata,
+            **aux_data_kwargs,
+        )
 
-        # handle aux data
+        self.dem_data = cast(DEMData, dem_data)
 
-        # calc compsoites
+        gwso_data = extract_aux_data(
+            aux_path=self.gswo_path,
+            aux_type=AuxTypes.GSWO,
+            no_data=self.gswo_nodata,
+            **aux_data_kwargs,
+        )
+
+        self.gwso_data = cast(GSWOData, gwso_data)
+
+        # calc NDVI
+
+        # calc NSDI
 
         # detect snow
 
@@ -137,9 +164,6 @@ class fmask:
         outfile_path.mkdir(exist_ok=True)
 
         return outfile_path
-
-    def extract_aux_data(self):
-        ...
 
     def _calc_ndvi():
         ...

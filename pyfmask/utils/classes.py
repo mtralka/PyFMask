@@ -4,6 +4,7 @@ from typing import Any
 from typing import Dict
 from typing import Optional
 from typing import Union
+from enum import Enum
 
 import numpy as np
 
@@ -15,6 +16,10 @@ import numpy as np
 # class SupportedSensors(Enum):
 #     L08_OLI = Landsat8
 #     S2_MSI = Sentinel2
+
+# class SupportedSensors(Enum):
+# #     L08_OLI = Landsat8
+# #     S2_MSI = Sentinel2
 
 
 @dataclass
@@ -36,3 +41,15 @@ class SensorData:
     nodata_mask: Optional[Any] = None
     vis_saturation: Optional[np.ndarray] = None
     band_data: Optional[Dict[str, np.ndarray]] = None
+
+
+@dataclass
+class DEMData:
+    dem: np.ndarray
+    slope: np.ndarray
+    aspect: np.ndarray
+
+
+@dataclass
+class GSWOData:
+    gswo: np.ndarray
