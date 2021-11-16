@@ -1,0 +1,7 @@
+{
+    "python.pythonPath": "C:\\Users\\mtral\\AppData\\Local\\pypoetry\\Cache\\virtualenvs\\pyfmask-BqwVv27y-py3.8\\Scripts\\python.exe",
+    "python.linting.flake8Enabled": false,
+    "python.linting.mypyEnabled": true,
+    "python.linting.enabled": true,
+    "python.linting.lintOnSave": true,
+}
