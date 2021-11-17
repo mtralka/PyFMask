@@ -8,15 +8,17 @@ from typing import cast
 import numpy as np
 
 from pyfmask.detectors import detect_snow
+from pyfmask.detectors import detect_water
 from pyfmask.extractors.auxillary_data import AuxTypes
 from pyfmask.extractors.auxillary_data import extract_aux_data
 from pyfmask.platforms.landsat8 import Landsat8
+from pyfmask.raster_utilities.composites import create_cdi
+from pyfmask.raster_utilities.composites import create_ndbi
+from pyfmask.raster_utilities.composites import create_ndsi
+from pyfmask.raster_utilities.composites import create_ndvi
 from pyfmask.utils.classes import DEMData
 from pyfmask.utils.classes import GSWOData
 from pyfmask.utils.classes import SensorData
-from pyfmask.utils.raster_utils import create_ndbi
-from pyfmask.utils.raster_utils import create_ndsi
-from pyfmask.utils.raster_utils import create_ndvi
 
 
 class fmask:
@@ -59,7 +61,7 @@ class fmask:
 
         self.platform_data: SensorData
         self.dem_data: Optional[DEMData]
-        self.gwso_data: Optional[GSWOData]
+        self.gswo_data: Optional[GSWOData]
 
         self.ndvi: np.ndarray
         self.ndsi: np.ndarray
@@ -99,14 +101,14 @@ class fmask:
 
         self.dem_data = cast(DEMData, dem_data) if dem_data else None
 
-        gwso_data = extract_aux_data(
+        gswo_data = extract_aux_data(
             aux_path=self.gswo_path,
             aux_type=AuxTypes.GSWO,
             no_data=self.gswo_nodata,
             **aux_data_kwargs,
         )
 
-        self.gwso_data = cast(GSWOData, gwso_data) if gwso_data else None
+        self.gswo_data = cast(GSWOData, gswo_data) if gswo_data else None
 
         ##
         # Calculate required spectral composites
@@ -134,10 +136,24 @@ class fmask:
         ##
         # Detect water
         ##
+        self.water = detect_water(
+            self.platform_data.band_data["NIR"],
+            self.ndvi,
+            self.platform_data.nodata_mask,
+            self.snow,
+            self._safe_gswo(),
+        )
 
         ##
         # Calculate CDI if platform is S2
         ##
+        # TODO test this
+        if self.platform_data.sensor == "S2_MSI":
+            self.cdi = create_cdi(
+                self.platform_data.band_data["NIR"],
+                self.platform_data.band_data["NIR2"],
+                self.platform_data.band_data["RED3"],
+            )
 
         # detect pot clouds pixels
 
@@ -216,3 +232,10 @@ class fmask:
             return None
 
         return self.platform_data.band_data.BT
+
+    def _safe_gswo(self) -> Optional[np.ndarray]:
+
+        if not hasattr(self, "gwso_data.gswo"):
+            return None
+
+        return self.gswo_data.gswo

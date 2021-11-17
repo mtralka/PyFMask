@@ -12,8 +12,8 @@ import numpy as np
 # from pyfmask.utils.classes import SupportedSensors
 from pyfmask.extractors.metadata import extract_metadata
 from pyfmask.platforms.platform_utils import calculate_erosion_pixels
+from pyfmask.raster_utilities.utils import NO_DATA
 from pyfmask.utils.classes import SensorData
-from pyfmask.utils.raster_utils import NO_DATA
 
 
 class Landsat8:
