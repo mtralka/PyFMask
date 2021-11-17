@@ -1,18 +1,18 @@
+from os import path
 from pathlib import Path
 from types import FunctionType
 from typing import Any
 from typing import Dict
 from typing import Final
 from typing import List
-
 from typing import Optional
-
 from typing import Union
 
 import gdal
+import numpy as np
 import osr
-from pyfmask.auxillary_data_extractor.dataset_creator import create_aux_dataset
-from pyfmask.auxillary_data_extractor.types import AuxTypes
+from pyfmask.extractors.auxillary_data.dataset_creator import create_aux_dataset
+from pyfmask.extractors.auxillary_data.types import AuxTypes
 from pyfmask.utils.classes import DEMData
 from pyfmask.utils.classes import GSWOData
 
@@ -30,6 +30,7 @@ def extract_aux_data(
     out_resolution: int,
     scene_id: str,
     no_data: Union[int, float],
+    temp_dir: Path
 ) -> Optional[Union[DEMData, GSWOData]]:
 
     if not isinstance(aux_type, AuxTypes):
@@ -59,22 +60,38 @@ def extract_aux_data(
 
     extractor_function: FunctionType = supported_platforms[aux_type]
 
-    data: Union[DEMData, GSWOData] = extractor_function(ds)
+    data: Union[DEMData, GSWOData] = extractor_function(ds, scene_id=scene_id, temp_dir=temp_dir)
 
     ds = None
 
     return data
 
 
-def extract_dem_data() -> DEMData:
+def extract_dem_data(ds, scene_id: str, temp_dir: Path) -> DEMData:
 
-    # calc dem, slop, aspect
-    # return DEMData
-    ...
+    dem_arr: np.ndarray = ds.GetRasterBand(1).ReadAsArray()
+
+    slope_name: str = f"{scene_id}_slope.tif"
+    slope_ds = gdal.DEMProcessing(str(temp_dir / slope_name), ds, processing='slope', slopeFormat='degree')
+    slope_arr: np.ndarray = slope_ds.GetRasterBand(1).ReadAsArray()
+    slope_ds = None
+    
+    aspect_name: str = f"{scene_id}_aspect.tif"
+    aspect_ds = gdal.DEMProcessing(str(temp_dir / aspect_name), ds, processing='aspect', zeroForFlat=True)
+    aspect_arr: np.ndarray  = aspect_ds.GetRasterBand(1).ReadAsArray()
+    aspect_ds = None
+
+    ds = None
+
+    return DEMData(dem=dem_arr, slope=slope_arr, aspect=aspect_arr)
 
 
-def extract_gswo_data() -> GSWOData:
-    # calc gdwo
-    # return GSWOData
+def extract_gswo_data(ds, **kwargs: Any) -> GSWOData:
+    
+    gswo_arr: np.ndarray = ds.GetRasterBand(1).ReadAsArray()
+    ds = None
 
-    ...
+    #  255 is 100% ocean
+    filter_arr: np.ndarray = np.where(gswo_arr==255, 100, gswo_arr)
+    
+    return GSWOData(gswo=filter_arr)

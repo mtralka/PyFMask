@@ -1,7 +1,6 @@
 from enum import Enum
 from enum import auto
-from collections import namedtuple
-from typing import Dict, NamedTuple
+from typing import NamedTuple
 
 
 class AuxTypes(Enum):

@@ -65,6 +65,7 @@ class fmask:
             "geo_transform": self.platform_data.geo_transform,
             "out_resolution": self.platform_data.out_resolution,
             "scene_id": self.platform_data.scene_id,
+            "temp_dir": self.temp_dir
         }
 
         dem_data = extract_aux_data(

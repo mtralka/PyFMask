@@ -8,11 +8,11 @@ from typing import Union
 
 import gdal
 import osr
-from pyfmask.auxillary_data_extractor.name_extractor import get_gswo_names
-from pyfmask.auxillary_data_extractor.name_extractor import get_topo30_names
-from pyfmask.auxillary_data_extractor.types import AuxTypes
-from pyfmask.auxillary_data_extractor.types import BoundingBox
-from pyfmask.auxillary_data_extractor.types import Coordinate
+from pyfmask.extractors.auxillary_data.name_extractor import get_gswo_names
+from pyfmask.extractors.auxillary_data.name_extractor import get_topo30_names
+from pyfmask.extractors.auxillary_data.types import AuxTypes
+from pyfmask.extractors.auxillary_data.types import BoundingBox
+from pyfmask.extractors.auxillary_data.types import Coordinate
 
 
 RESAMPLING_METHOD: Final[str] = "bilinear"
