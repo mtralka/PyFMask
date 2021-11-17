@@ -89,6 +89,8 @@ class fmask:
 
         # calc NSDI
 
+        # calc NDBI
+
         # detect snow
 
         # detect water
@@ -164,15 +166,3 @@ class fmask:
         outfile_path.mkdir(exist_ok=True)
 
         return outfile_path
-
-    def _calc_ndvi():
-        ...
-
-    def _calc_ndsi():
-        ...
-
-    def _detect_snow():
-        ...
-
-    def _detect_water():
-        ...
