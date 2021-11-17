@@ -9,47 +9,47 @@ def get_topo30_names(bbox: BoundingBox) -> list:
     east = bbox.EAST
 
     # Processing North-South Lat data 90..-90
-    idx_north = int((90-north)/50.)
-    idx_south = int((90-south)/50.)
+    idx_north = int((90 - north) / 50.0)
+    idx_south = int((90 - south) / 50.0)
     # print(idx_north, idx_south)
     fname_list_tmp = []
-    for k in range(idx_north, idx_south+1):     
-        idx_lat = 90 - 50*k
+    for k in range(idx_north, idx_south + 1):
+        idx_lat = 90 - 50 * k
         # print(idx_lat)
         if idx_lat > 0:
-            idx_str = f'n{idx_lat}'
+            idx_str = f"n{idx_lat}"
         else:
-            idx_str = f's{abs(idx_lat)}'
+            idx_str = f"s{abs(idx_lat)}"
         fname_list_tmp.append(idx_str)
 
-    # Processing West-East Lon -180..180   
+    # Processing West-East Lon -180..180
     for f_north in fname_list_tmp:
-        if ('s60' in f_north):   
-            step = 60.
+        if "s60" in f_north:
+            step = 60.0
         else:
-            step = 40.
-        idx_west = int((west+180)/step)
-        idx_east = int((east+180)/step)
-        
+            step = 40.0
+        idx_west = int((west + 180) / step)
+        idx_east = int((east + 180) / step)
+
         if west <= east:
-            idx_list = [*range(idx_west, idx_east+1)]
+            idx_list = [*range(idx_west, idx_east + 1)]
         else:
             # Processing a situation when west > east
             # this happens when corssing 180E and 180W line
             # there can be both Landsat and Sentinel scenes
             # from west to 180E
-            max_idx = int((180+180)/step)
+            max_idx = int((180 + 180) / step)
             min_idx = 0
-            idx_list = [*range(idx_west, max_idx), *range(0, idx_east+1)]
-        
+            idx_list = [*range(idx_west, max_idx), *range(0, idx_east + 1)]
+
         for k in idx_list:
-            idx_lon = int(-180 + step*k)
+            idx_lon = int(-180 + step * k)
             # print(idx_lon)
-            if idx_lon<=0:
-                idx_str = 'w%03d'%(abs(idx_lon))
+            if idx_lon <= 0:
+                idx_str = "w%03d" % (abs(idx_lon))
             else:
-                idx_str = 'e%03d'%(idx_lon)
-                f_str = f'gt30{idx_str}{f_north}'
+                idx_str = "e%03d" % (idx_lon)
+                f_str = f"gt30{idx_str}{f_north}"
                 fname_list.append(f_str)
 
     return fname_list
@@ -63,51 +63,51 @@ def get_gswo_names(bbox: BoundingBox) -> list:
     east = bbox.EAST
 
     # Processing North-South Lat data 80..-80 (or UL 80..-70)
-    step = 10.
-    idx_north = int((90-north)/step)
-    idx_south = int((90-south)/step)
+    step = 10.0
+    idx_north = int((90 - north) / step)
+    idx_south = int((90 - south) / step)
     # print(idx_north, idx_south)
     fname_list_tmp = []
-    for k in range(idx_north, idx_south+1):     
-        idx_lat = int(90 - step*k)
+    for k in range(idx_north, idx_south + 1):
+        idx_lat = int(90 - step * k)
         # only 80..-80 available
-        if (idx_lat==90) | (idx_lat==-80):
+        if (idx_lat == 90) | (idx_lat == -80):
             continue
         # print(idx_lat)
         if idx_lat >= 0:
-            idx_str = f'{idx_lat}N'
+            idx_str = f"{idx_lat}N"
         else:
-            idx_str = f'{abs(idx_lat)}S'
-        fname_tmp = f'{idx_str}'
+            idx_str = f"{abs(idx_lat)}S"
+        fname_tmp = f"{idx_str}"
         fname_list_tmp.append(fname_tmp)
 
     # Processing West-East Lon -180..180 (or UL-180..170)
     step = 10
     for f_north in fname_list_tmp:
-        idx_west = int((west+180)/step)
-        idx_east = int((east+180)/step)
-        
+        idx_west = int((west + 180) / step)
+        idx_east = int((east + 180) / step)
+
         if west <= east:
-            idx_list = [*range(idx_west, idx_east+1)]
+            idx_list = [*range(idx_west, idx_east + 1)]
         else:
             # Processing a situation when west > east
             # this happens when corssing 180E and 180W line
             # there can be both Landsat and Sentinel scenes
             # from west to 180E
-            max_idx = int((180+180)/step)
+            max_idx = int((180 + 180) / step)
             min_idx = 0
-            idx_list = [*range(idx_west, max_idx), *range(0, idx_east+1)]
-        
-        for k in idx_list:     
-            idx_lon = int(-180 + step*k)
+            idx_list = [*range(idx_west, max_idx), *range(0, idx_east + 1)]
+
+        for k in idx_list:
+            idx_lon = int(-180 + step * k)
             # print(idx_lon)
-            if idx_lon<0:
-                idx_str = f'{abs(idx_lon)}W'
+            if idx_lon < 0:
+                idx_str = f"{abs(idx_lon)}W"
             else:
-                idx_str = f'{idx_lon}E'
-                fname = f'occurrence_{idx_str}_{f_north}'
+                idx_str = f"{idx_lon}E"
+                fname = f"occurrence_{idx_str}_{f_north}"
                 fname_list.append(fname)
-            
+
     # print(fname_list_tmp)
 
     return fname_list

@@ -8,12 +8,12 @@ from typing import Union
 
 import gdal
 import numpy as np
-from pyfmask.utils.classes import SensorData
 
 # from pyfmask.utils.classes import SupportedSensors
 from pyfmask.extractors.metadata import extract_metadata
-from pyfmask.utils.raster_utils import NO_DATA
 from pyfmask.platforms.platform_utils import calculate_erosion_pixels
+from pyfmask.utils.classes import SensorData
+from pyfmask.utils.raster_utils import NO_DATA
 
 
 class Landsat8:
@@ -178,9 +178,9 @@ class Landsat8:
                 band_array == 0, NO_DATA, processed_band_array
             ).astype(np.int16)
 
-            parameters.band_data[band] = processed_band_array
+            parameters.band_data[band_name] = processed_band_array
 
-        parameters.x_size = parameters.band_data[cls.Bands.RED].shape[1]
-        parameters.y_size = parameters.band_data[cls.Bands.RED].shape[0]
+        parameters.x_size = parameters.band_data["RED"].shape[1]
+        parameters.y_size = parameters.band_data["RED"].shape[0]
 
         return parameters

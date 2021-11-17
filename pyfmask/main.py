@@ -5,12 +5,18 @@ from typing import Optional
 from typing import Union
 from typing import cast
 
+import numpy as np
+
+from pyfmask.detectors import detect_snow
 from pyfmask.extractors.auxillary_data import AuxTypes
 from pyfmask.extractors.auxillary_data import extract_aux_data
 from pyfmask.platforms.landsat8 import Landsat8
 from pyfmask.utils.classes import DEMData
 from pyfmask.utils.classes import GSWOData
 from pyfmask.utils.classes import SensorData
+from pyfmask.utils.raster_utils import create_ndbi
+from pyfmask.utils.raster_utils import create_ndsi
+from pyfmask.utils.raster_utils import create_ndvi
 
 
 class fmask:
@@ -55,12 +61,25 @@ class fmask:
         self.dem_data: Optional[DEMData]
         self.gwso_data: Optional[GSWOData]
 
+        self.ndvi: np.ndarray
+        self.ndsi: np.ndarray
+        self.ndbi: np.ndarray
+
     def run(self) -> None:
 
+        ##
+        # Extract platform data
+        ##
         self.platform_data = self.extract_platform_data()
-        
+
+        ##
+        # Create temp directory for intermediary files
+        ##
         self.temp_dir: Path = self._create_temp_directory()
-        print("CREATED TEMP DIR")
+
+        ##
+        # Extract data from DEMs and GSWOs
+        ##
         aux_data_kwargs: Dict[str, Any] = {
             "projection_reference": self.platform_data.projection_reference,
             "x_size": self.platform_data.x_size,
@@ -68,7 +87,7 @@ class fmask:
             "geo_transform": self.platform_data.geo_transform,
             "out_resolution": self.platform_data.out_resolution,
             "scene_id": self.platform_data.scene_id,
-            "temp_dir": self.temp_dir
+            "temp_dir": self.temp_dir,
         }
 
         dem_data = extract_aux_data(
@@ -77,7 +96,7 @@ class fmask:
             no_data=self.dem_nodata,
             **aux_data_kwargs,
         )
-        print("DEM DATA")
+
         self.dem_data = cast(DEMData, dem_data) if dem_data else None
 
         gwso_data = extract_aux_data(
@@ -86,20 +105,39 @@ class fmask:
             no_data=self.gswo_nodata,
             **aux_data_kwargs,
         )
-        print("GSWO DATA")
+
         self.gwso_data = cast(GSWOData, gwso_data) if gwso_data else None
 
-        # calc NDVI
+        ##
+        # Calculate required spectral composites
+        ##
+        self.ndvi = create_ndvi(
+            self.platform_data.band_data["RED"], self.platform_data.band_data["NIR"]
+        )
+        self.ndsi = create_ndsi(
+            self.platform_data.band_data["GREEN"], self.platform_data.band_data["SWIR1"]
+        )
+        self.ndbi = create_ndbi(
+            self.platform_data.band_data["SWIR1"], self.platform_data.band_data["NIR"]
+        )
 
-        # calc NSDI
+        ##
+        # Detect snow
+        ##
+        self.snow = detect_snow(
+            self.ndsi,
+            self.platform_data.band_data["NIR"],
+            self.platform_data.band_data["GREEN"],
+            self._safe_bt(),
+        )
 
-        # calc NDBI
+        ##
+        # Detect water
+        ##
 
-        # detect snow
-
-        # detect water
-
-        # calc cdi if s2
+        ##
+        # Calculate CDI if platform is S2
+        ##
 
         # detect pot clouds pixels
 
@@ -171,3 +209,10 @@ class fmask:
         outfile_path.mkdir(exist_ok=True)
 
         return outfile_path
+
+    def _safe_bt(self) -> Optional[np.ndarray]:
+
+        if not hasattr(self, "platform_data.band_data.BT"):
+            return None
+
+        return self.platform_data.band_data.BT

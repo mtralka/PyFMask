@@ -28,7 +28,7 @@ def create_aux_dataset(
     out_resolution: int,
     scene_id: str,
     no_data: Union[int, float],
-    temp_dir: Path
+    temp_dir: Path,
 ):
 
     original_upper_left: Coordinate = Coordinate(geo_transform[0], geo_transform[3])
@@ -69,7 +69,7 @@ def create_aux_dataset(
     for file in aux_file_names:
 
         file_name_zip: str = file + ".zip"
-        file_name_tif: str = file + ".tif" 
+        file_name_tif: str = file + ".tif"
 
         full_file_name_zip: Path = aux_path / file_name_zip
 
@@ -82,7 +82,7 @@ def create_aux_dataset(
 
         if not aux_ds:
             continue
-        
+
         aux_dataset_list.append(aux_ds)
 
     if len(aux_dataset_list) <= 0:

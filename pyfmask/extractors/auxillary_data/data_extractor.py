@@ -30,7 +30,7 @@ def extract_aux_data(
     out_resolution: int,
     scene_id: str,
     no_data: Union[int, float],
-    temp_dir: Path
+    temp_dir: Path,
 ) -> Optional[Union[DEMData, GSWOData]]:
 
     if not isinstance(aux_type, AuxTypes):
@@ -48,7 +48,7 @@ def extract_aux_data(
         out_resolution,
         scene_id,
         no_data,
-        temp_dir
+        temp_dir,
     )
     if ds is None:
         return None
@@ -60,7 +60,9 @@ def extract_aux_data(
 
     extractor_function: FunctionType = data_extractors[aux_type]
 
-    data: Union[DEMData, GSWOData] = extractor_function(ds, scene_id=scene_id, temp_dir=temp_dir)
+    data: Union[DEMData, GSWOData] = extractor_function(
+        ds, scene_id=scene_id, temp_dir=temp_dir
+    )
     ds = None
 
     return data
@@ -71,13 +73,17 @@ def extract_dem_data(ds, scene_id: str, temp_dir: Path) -> DEMData:
     dem_arr: np.ndarray = ds.GetRasterBand(1).ReadAsArray()
 
     slope_name: str = f"{scene_id}_slope.tif"
-    slope_ds = gdal.DEMProcessing(str(temp_dir / slope_name), ds, processing='slope', slopeFormat='degree')
+    slope_ds = gdal.DEMProcessing(
+        str(temp_dir / slope_name), ds, processing="slope", slopeFormat="degree"
+    )
     slope_arr: np.ndarray = slope_ds.GetRasterBand(1).ReadAsArray()
     slope_ds = None
-    
+
     aspect_name: str = f"{scene_id}_aspect.tif"
-    aspect_ds = gdal.DEMProcessing(str(temp_dir / aspect_name), ds, processing='aspect', zeroForFlat=True)
-    aspect_arr: np.ndarray  = aspect_ds.GetRasterBand(1).ReadAsArray()
+    aspect_ds = gdal.DEMProcessing(
+        str(temp_dir / aspect_name), ds, processing="aspect", zeroForFlat=True
+    )
+    aspect_arr: np.ndarray = aspect_ds.GetRasterBand(1).ReadAsArray()
     aspect_ds = None
 
     ds = None
@@ -86,11 +92,11 @@ def extract_dem_data(ds, scene_id: str, temp_dir: Path) -> DEMData:
 
 
 def extract_gswo_data(ds, **kwargs: Any) -> GSWOData:
-    
+
     gswo_arr: np.ndarray = ds.GetRasterBand(1).ReadAsArray()
     ds = None
 
     #  255 is 100% ocean
-    filter_arr: np.ndarray = np.where(gswo_arr==255, 100, gswo_arr)
-    
+    filter_arr: np.ndarray = np.where(gswo_arr == 255, 100, gswo_arr)
+
     return GSWOData(gswo=filter_arr)
