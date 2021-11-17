@@ -28,6 +28,7 @@ def create_aux_dataset(
     out_resolution: int,
     scene_id: str,
     no_data: Union[int, float],
+    temp_dir: Path
 ):
 
     original_upper_left: Coordinate = Coordinate(geo_transform[0], geo_transform[3])
@@ -63,36 +64,35 @@ def create_aux_dataset(
     get_names: FunctionType = supported_platforms[aux_type]
 
     aux_file_names: List[str] = get_names(bbox)
-
-    aux_dataset_list: List[Path]
-
+    print(aux_file_names, "FILE NAMES")
+    aux_dataset_list: List[Path] = []
     for file in aux_file_names:
 
-        file_name_zip: Path = Path(file) / ".zip"
-        file_name_tif: Path = Path(file) / ".tif"
+        file_name_zip: str = file + ".zip"
+        file_name_tif: str = file + ".tif" 
 
         full_file_name_zip: Path = aux_path / file_name_zip
 
         if not full_file_name_zip.is_file():
-            break
+            continue
 
-        full_file_name_tif: Path = Path("/vsizip") / full_file_name_zip / file_name_tif
+        full_file_name_tif: Path = full_file_name_zip / file_name_tif
 
-        aux_ds = gdal.Open(full_file_name_tif)
+        aux_ds = gdal.Open("/vsizip/" + str(full_file_name_tif))
 
         if not aux_ds:
-            break
-
+            continue
+        
         aux_dataset_list.append(aux_ds)
 
     if len(aux_dataset_list) <= 0:
         print("No Aux DS files found")
         return None
 
-    outfile: Path = aux_path / f"_{scene_id}{aux_type.name}.tif"
+    outfile_path: Path = temp_dir / f"_{scene_id}{aux_type.name}.tif"
 
     ds = gdal.Warp(
-        outfile,
+        str(outfile_path),
         aux_dataset_list,
         dstSRS=proj_ref_lat_lon,
         xRes=out_resolution,

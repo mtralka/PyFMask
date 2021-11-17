@@ -1,20 +1,23 @@
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 from typing import Dict
 from typing import Optional
 from typing import Union
+from typing import cast
 
-from pyfmask.extractors.auxillary_data import extract_aux_data
 from pyfmask.extractors.auxillary_data import AuxTypes
+from pyfmask.extractors.auxillary_data import extract_aux_data
 from pyfmask.platforms.landsat8 import Landsat8
-from pyfmask.utils.classes import SensorData, DEMData, GSWOData
+from pyfmask.utils.classes import DEMData
+from pyfmask.utils.classes import GSWOData
+from pyfmask.utils.classes import SensorData
 
 
 class fmask:
     def __init__(
         self,
         infile: Union[Path, str],
-        outfile: Union[Path, str],
+        out_dir: Union[Path, str],
         dem_path: Union[Path, str],
         gswo_path: Union[Path, str],
         cloud_threshold: Optional[Union[float, int]] = None,
@@ -28,7 +31,7 @@ class fmask:
         self.infile: Path = self._valdiate_path(
             infile, check_exists=True, check_is_file=True
         )
-        self.outfile: Path = self._valdiate_path(outfile, check_is_dir=True)
+        self.out_dir: Path = self._valdiate_path(out_dir, check_is_dir=True)
         self.dem_path: Path = self._valdiate_path(
             dem_path, check_exists=True, check_is_dir=True
         )
@@ -55,9 +58,9 @@ class fmask:
     def run(self) -> None:
 
         self.platform_data = self.extract_platform_data()
-
+        
         self.temp_dir: Path = self._create_temp_directory()
-
+        print("CREATED TEMP DIR")
         aux_data_kwargs: Dict[str, Any] = {
             "projection_reference": self.platform_data.projection_reference,
             "x_size": self.platform_data.x_size,
@@ -74,8 +77,8 @@ class fmask:
             no_data=self.dem_nodata,
             **aux_data_kwargs,
         )
-
-        self.dem_data = cast(DEMData, dem_data)
+        print("DEM DATA")
+        self.dem_data = cast(DEMData, dem_data) if dem_data else None
 
         gwso_data = extract_aux_data(
             aux_path=self.gswo_path,
@@ -83,8 +86,8 @@ class fmask:
             no_data=self.gswo_nodata,
             **aux_data_kwargs,
         )
-
-        self.gwso_data = cast(GSWOData, gwso_data)
+        print("GSWO DATA")
+        self.gwso_data = cast(GSWOData, gwso_data) if gwso_data else None
 
         # calc NDVI
 
@@ -159,7 +162,8 @@ class fmask:
 
     def _create_temp_directory(self) -> Path:
 
-        outfile_path: Path = self.outfile / str(self.data.scene_id) + "_temp"
+        temp_name: str = str(self.platform_data.scene_id) + "_temp"
+        outfile_path: Path = self.out_dir / temp_name
 
         if outfile_path.exists():
             print("WARN, outfile path exists, rewriting")

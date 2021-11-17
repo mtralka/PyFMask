@@ -48,20 +48,19 @@ def extract_aux_data(
         out_resolution,
         scene_id,
         no_data,
+        temp_dir
     )
-
     if ds is None:
         return None
 
-    supported_platforms: Dict[Any, FunctionType] = {
+    data_extractors: Dict[Any, FunctionType] = {
         AuxTypes.DEM: extract_dem_data,
         AuxTypes.GSWO: extract_gswo_data,
     }
 
-    extractor_function: FunctionType = supported_platforms[aux_type]
+    extractor_function: FunctionType = data_extractors[aux_type]
 
     data: Union[DEMData, GSWOData] = extractor_function(ds, scene_id=scene_id, temp_dir=temp_dir)
-
     ds = None
 
     return data
