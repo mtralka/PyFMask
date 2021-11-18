@@ -2,6 +2,7 @@ from os import path
 from pathlib import Path
 from types import FunctionType
 from typing import Any
+from typing import Callable
 from typing import Dict
 from typing import Final
 from typing import List
@@ -53,7 +54,7 @@ def extract_aux_data(
     if ds is None:
         return None
 
-    data_extractors: Dict[Any, FunctionType] = {
+    data_extractors: Dict[Any, Callable[[Any, str, Path], Union[DEMData, GSWOData]]] = {
         AuxTypes.DEM: extract_dem_data,
         AuxTypes.GSWO: extract_gswo_data,
     }

@@ -1,8 +1,8 @@
-from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from typing import Any
 from typing import Dict
+from typing import Final
 from typing import List
 from typing import Union
 
@@ -28,6 +28,10 @@ class Landsat8:
         BT = 10
 
     RGB: tuple = (Bands.RED, Bands.GREEN, Bands.BLUE)
+
+    CLOUD_THRESHOLD: Final[float] = 17.5
+    PROBABILITY_WEIGHT: Final[float] = 0.3
+    OUT_RESOLUTION: Final[int] = 30
 
     @staticmethod
     def is_platform(file_path: Union[Path, str]) -> bool:
@@ -85,22 +89,26 @@ class Landsat8:
 
         file_path = Path(file_path) if isinstance(file_path, str) else file_path
 
-        parameters = SensorData(
-            cloud_threshold=17.5, probability_weight=0.3, out_resolution=30
-        )
+        parameters: Dict[str, Any] = {
+            "cloud_threshold": cls.CLOUD_THRESHOLD,
+            "probability_weight": cls.PROBABILITY_WEIGHT,
+            "out_resolution": cls.OUT_RESOLUTION,
+        }
 
         calibration = cls._get_calibration_parameters(file_path)
         file_band_names = cls._get_file_names(file_path)
 
-        parameters.file_band_names = file_band_names
-        parameters.sensor = "L08_OLI"  # SupportedSensors.L08_OLI
-        parameters.sun_azimuth = float(calibration.pop("SUN_AZIMUTH"))
-        parameters.sun_elevation = float(calibration.pop("SUN_ELEVATION"))
-        parameters.calibration = calibration
-        parameters.scene_id = file_path.name.split("_MTL.txt")[0]  # TODO REDO this
-        parameters.erode_pixels = calculate_erosion_pixels(parameters.out_resolution)
+        parameters["file_band_names"] = file_band_names
+        parameters["sensor"] = "L08_OLI"  # SupportedSensors.L08_OLI
+        parameters["sun_azimuth"] = float(calibration.pop("SUN_AZIMUTH"))
+        parameters["sun_elevation"] = float(calibration.pop("SUN_ELEVATION"))
+        parameters["calibration"] = calibration
+        parameters["scene_id"] = file_path.name.split("_MTL.txt")[0]  # TODO REDO this
+        parameters["erode_pixels"] = calculate_erosion_pixels(
+            parameters["out_resolution"]
+        )
 
-        parameters.band_data = {}
+        parameters["band_data"] = {}
 
         for band in cls.Bands.__members__.values():
             print(band)
@@ -116,26 +124,26 @@ class Landsat8:
             # Use RED band as projection base
             ##
             if band == cls.Bands.RED:
-                parameters.geo_transform = band_ds.GetGeoTransform()
-                parameters.projection_reference = band_ds.GetProjectionRef()
+                parameters["geo_transform"] = band_ds.GetGeoTransform()
+                parameters["projection_reference"] = band_ds.GetProjectionRef()
 
             ##
             # NoData
             ##
-            if not hasattr(parameters, "nodata_mask"):
-                parameters.nodata_mask = band_array == 0
+            if parameters.get("nodata_mask") is None:
+                parameters["nodata_mask"] = band_array == 0
             else:
-                parameters.nodata_mask = (parameters == True) | (band_array == 0)
+                parameters["nodata_mask"] = (parameters == True) | (band_array == 0)
 
             ##
             # Saturation of visible bands (RGB)
             ##
-            if not hasattr(parameters, "vis_saturation"):
-                parameters.vis_saturation = np.zero(band_array.shape).astype(np.bool)
+            if parameters.get("vis_saturation") is None:
+                parameters["vis_saturation"] = np.zeros(band_array.shape).astype(bool)
 
             if band in cls.RGB:
-                parameters.vis_saturation = np.where(
-                    band_array == 65535, True, parameters.vis_saturation
+                parameters["vis_saturation"] = np.where(
+                    band_array == 65535, True, parameters["vis_saturation"]
                 )
 
             ##
@@ -151,7 +159,7 @@ class Landsat8:
                 processed_band_array = (
                     1000
                     * processed_band_array
-                    / np.sin(parameters.sun_elevation * np.pi / 180)
+                    / np.sin(parameters["sun_elevation"] * np.pi / 180)
                 )
 
             elif band == cls.Bands.BT:
@@ -178,9 +186,9 @@ class Landsat8:
                 band_array == 0, NO_DATA, processed_band_array
             ).astype(np.int16)
 
-            parameters.band_data[band_name] = processed_band_array
+            parameters["band_data"][band_name] = processed_band_array
 
-        parameters.x_size = parameters.band_data["RED"].shape[1]
-        parameters.y_size = parameters.band_data["RED"].shape[0]
+        parameters["x_size"] = parameters["band_data"]["RED"].shape[1]
+        parameters["y_size"] = parameters["band_data"]["RED"].shape[0]
 
-        return parameters
+        return SensorData(**parameters)

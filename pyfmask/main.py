@@ -12,12 +12,14 @@ from pyfmask.detectors import detect_water
 from pyfmask.extractors.auxillary_data import AuxTypes
 from pyfmask.extractors.auxillary_data import extract_aux_data
 from pyfmask.platforms.landsat8 import Landsat8
+from pyfmask.probability_detectors import detect_probable_cloud_pixels
 from pyfmask.raster_utilities.composites import create_cdi
 from pyfmask.raster_utilities.composites import create_ndbi
 from pyfmask.raster_utilities.composites import create_ndsi
 from pyfmask.raster_utilities.composites import create_ndvi
 from pyfmask.utils.classes import DEMData
 from pyfmask.utils.classes import GSWOData
+from pyfmask.utils.classes import PotentialCloudPixels
 from pyfmask.utils.classes import SensorData
 
 
@@ -66,6 +68,8 @@ class fmask:
         self.ndvi: np.ndarray
         self.ndsi: np.ndarray
         self.ndbi: np.ndarray
+
+        self.probable_clouds: PotentialCloudPixels
 
     def run(self) -> None:
 
@@ -128,9 +132,7 @@ class fmask:
         ##
         self.snow = detect_snow(
             self.ndsi,
-            self.platform_data.band_data["NIR"],
-            self.platform_data.band_data["GREEN"],
-            self._safe_bt(),
+            band_data=self.platform_data.band_data,
         )
 
         ##
@@ -155,7 +157,17 @@ class fmask:
                 self.platform_data.band_data["RED3"],
             )
 
-        # detect pot clouds pixels
+        ##
+        # Detect probably cloud pixels
+        ##
+        self.probable_clouds = detect_probable_cloud_pixels(
+            ndsi=self.ndsi,
+            ndvi=self.ndvi,
+            band_data=self.platform_data.band_data,
+            vis_saturation=self.platform_data.vis_saturation,
+            dem_data=self.dem_data,
+            nodata_mask=self.platform_data.nodata_mask,
+        )
 
         # if cirrus band
         # update normalized
@@ -226,16 +238,9 @@ class fmask:
 
         return outfile_path
 
-    def _safe_bt(self) -> Optional[np.ndarray]:
-
-        if not hasattr(self, "platform_data.band_data.BT"):
-            return None
-
-        return self.platform_data.band_data.BT
-
     def _safe_gswo(self) -> Optional[np.ndarray]:
 
         if not hasattr(self, "gwso_data.gswo"):
             return None
 
-        return self.gswo_data.gswo
+        return cast(np.ndarray, cast(GSWOData, self.gswo_data).gswo)

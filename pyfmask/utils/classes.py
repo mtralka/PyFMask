@@ -1,10 +1,10 @@
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
-from typing import Any
+from typing import Any, List
 from typing import Dict
 from typing import Optional
 from typing import Union
-from enum import Enum
 
 import numpy as np
 
@@ -27,20 +27,20 @@ class SensorData:
     cloud_threshold: float
     probability_weight: float
     out_resolution: int
-    x_size: Optional[int] = None
-    y_size: Optional[int] = None
-    erode_pixels: Optional[int] = None
-    sensor: Optional[Any] = None
-    scene_id: Optional[int] = None
-    sun_elevation: Optional[Union[float, int]] = None
-    sun_azimuth: Optional[Union[float, int]] = None
-    geo_transform: Optional[tuple] = None  # CHECK
-    projection_reference: Optional[tuple] = None  # CHECK
-    calibration: Optional[Any] = None
-    file_band_names: Optional[Any] = None
-    nodata_mask: Optional[Any] = None
-    vis_saturation: Optional[np.ndarray] = None
-    band_data: Optional[Dict[str, np.ndarray]] = None
+    x_size: int
+    y_size: int
+    erode_pixels: int
+    sensor: str
+    scene_id: str
+    sun_elevation: Union[float, int]
+    sun_azimuth: Union[float, int]
+    geo_transform: tuple
+    projection_reference: tuple
+    calibration: Any
+    file_band_names: List[str]
+    nodata_mask: np.ndarray
+    vis_saturation: np.ndarray
+    band_data: Dict[str, np.ndarray]
 
 
 @dataclass
@@ -53,3 +53,11 @@ class DEMData:
 @dataclass
 class GSWOData:
     gswo: np.ndarray
+
+
+@dataclass
+class PotentialCloudPixels:
+    potential_pixels: np.ndarray
+    whiteness: np.ndarray
+    hot: np.ndarray
+    normalized_cirrus: Optional[np.ndarray]
