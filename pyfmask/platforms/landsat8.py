@@ -96,6 +96,7 @@ class Landsat8:
         }
 
         calibration = cls._get_calibration_parameters(file_path)
+
         file_band_names = cls._get_file_names(file_path)
 
         parameters["file_band_names"] = file_band_names
@@ -111,14 +112,14 @@ class Landsat8:
         parameters["band_data"] = {}
 
         for band in cls.Bands.__members__.values():
-            print(band)
+
             band_number = band.value
             band_name = band.name
 
             band_path: Path = file_path.parent / file_band_names[band_name]
 
             band_ds = gdal.Open(str(band_path))
-            band_array = band_ds.GetRasterBand(1).ReadAsArray().astype(np.uintc)
+            band_array = band_ds.GetRasterBand(1).ReadAsArray().astype(np.uint16)
 
             ##
             # Use RED band as projection base
@@ -133,7 +134,9 @@ class Landsat8:
             if parameters.get("nodata_mask") is None:
                 parameters["nodata_mask"] = band_array == 0
             else:
-                parameters["nodata_mask"] = (parameters == True) | (band_array == 0)
+                parameters["nodata_mask"] = (parameters["nodata_mask"] == True) | (
+                    band_array == 0
+                )
 
             ##
             # Saturation of visible bands (RGB)
@@ -149,17 +152,18 @@ class Landsat8:
             ##
             # Convert to TOA reflectance
             ##
-            processed_band_array: np.ndarray
+            # processed_band_array: np.ndarray
 
             if band != cls.Bands.BT:
                 processed_band_array = (
                     band_array * calibration[f"REFLECTANCE_MULT_BAND_{band_number}"]
                     + calibration[f"REFLECTANCE_ADD_BAND_{band_number}"]
                 )
+
                 processed_band_array = (
-                    1000
+                    10000
                     * processed_band_array
-                    / np.sin(parameters["sun_elevation"] * np.pi / 180)
+                    / np.sin(parameters["sun_elevation"] * np.pi / 180.0)
                 )
 
             elif band == cls.Bands.BT:

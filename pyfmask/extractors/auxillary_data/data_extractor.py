@@ -51,6 +51,7 @@ def extract_aux_data(
         no_data,
         temp_dir,
     )
+
     if ds is None:
         return None
 
@@ -88,6 +89,8 @@ def extract_dem_data(ds, scene_id: str, temp_dir: Path) -> DEMData:
     aspect_ds = None
 
     ds = None
+
+    print("GOT ", str(temp_dir / aspect_name))
 
     return DEMData(dem=dem_arr, slope=slope_arr, aspect=aspect_arr)
 

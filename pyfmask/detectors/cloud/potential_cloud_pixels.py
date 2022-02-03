@@ -7,7 +7,7 @@ from pyfmask.utils.classes import DEMData
 from pyfmask.utils.classes import PotentialCloudPixels
 
 
-def detect_probable_cloud_pixels(
+def detect_potential_cloud_pixels(
     ndsi: np.ndarray,
     ndvi: np.ndarray,
     band_data: Dict[str, np.ndarray],
@@ -54,7 +54,7 @@ def detect_probable_cloud_pixels(
         + np.absolute(red - visible_mean)
     ) / visible_mean
     whiteness[vis_saturation == True] = 0
-    # If one visible is saturated whiteness == 0
+    # # If one visible is saturated whiteness == 0
     potential_pixels = (potential_pixels == True) & (whiteness < whiteness_limit)
 
     ##
@@ -78,6 +78,7 @@ def detect_probable_cloud_pixels(
     ##
     normalized_cirrus: Optional[np.ndarray] = None
     if cirrus is not None:
+
         normalized_cirrus = normalize_cirrus_dem(
             potential_pixels=potential_pixels,
             cirrus=cirrus,
@@ -111,26 +112,26 @@ def normalize_cirrus_dem(
     # clear sky pixels and valid data
     valid_clear_sky: np.ndarray = (potential_pixels == False) & (nodata_mask == False)
 
-    if dem is None or np.all(dem == dem[0]):
-        # this version with no DEM
-        prcnt = np.percentile(cirrus[valid_clear_sky], percentile)
-        # taking over data area
+    dem_mask: Union[np.ndarray, int] = (dem != -9999) if dem is not None else -1
+    if dem is None or (np.sum(dem_mask) < 100):
+        percent = np.percentile(cirrus[valid_clear_sky], percentile)
+
         normalized_cirrus = np.where(
-            nodata_mask == False, cirrus - prcnt, normalized_cirrus
+            nodata_mask == False, cirrus - percent, normalized_cirrus
         )
         normalized_cirrus[normalized_cirrus < 0] = 0
+
         return normalized_cirrus
 
-    # with DEM
-
-    # Taking percentile to remove outliers from DEM
-    dem_start: int = int(np.percentile(dem[dem != -9999], 0.001))
-    dem_end: int = int(np.percentile(dem[dem != -9999], 99.999))
+    ##
+    # Take percentiles to remove outliers
+    ##
+    dem_start: int = int(np.percentile(dem[dem_mask], 0.001))
+    dem_end: int = int(np.percentile(dem[dem_mask], 99.999))
     step: int = 100
 
     cirrus_lowest: Union[float, int] = 0.0
     for k in np.arange(dem_start, dem_end + step, step):
-        # take only in the range and only clear
         mm: np.ndarray = (cirrus >= k) & (cirrus < (k + step))
         mm_clear: np.ndarray = (mm == True) & (valid_clear_sky == True)
         if np.sum(mm_clear) > 0:

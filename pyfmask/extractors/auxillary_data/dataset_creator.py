@@ -44,6 +44,9 @@ def create_aux_dataset(
     WGS_84 = osr.SpatialReference()
     WGS_84.ImportFromEPSG(4326)
 
+    if int(gdal.VersionInfo()) >= 3000000:
+        WGS_84.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)
+
     transform = osr.CoordinateTransformation(proj_ref_lat_lon, WGS_84)
     (ul_lon, ul_lat, _) = transform.TransformPoint(
         original_upper_left.x, original_upper_left.y

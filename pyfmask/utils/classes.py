@@ -61,3 +61,14 @@ class PotentialCloudPixels:
     whiteness: np.ndarray
     hot: np.ndarray
     normalized_cirrus: Optional[np.ndarray]
+
+
+@dataclass
+class PotentialClouds:
+    sum_clear_pixels: int
+    cloud: np.ndarray
+    bt_normalized_dem: Optional[np.ndarray] = None
+    temp_test_low: Optional[Union[int, float]] = None
+    temp_test_high: Optional[Union[int, float]] = None
+    over_land_probability: Optional[np.ndarray] = None
+    over_water_probability: Optional[np.ndarray] = None
