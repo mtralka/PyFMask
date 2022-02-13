@@ -12,7 +12,6 @@ import numpy as np
 # from pyfmask.utils.classes import SupportedSensors
 from pyfmask.extractors.metadata import extract_metadata
 from pyfmask.platforms.platform_utils import calculate_erosion_pixels
-from pyfmask.raster_utilities.utils import NO_DATA
 from pyfmask.utils.classes import SensorData
 
 
@@ -32,6 +31,7 @@ class Landsat8:
     CLOUD_THRESHOLD: Final[float] = 17.5
     PROBABILITY_WEIGHT: Final[float] = 0.3
     OUT_RESOLUTION: Final[int] = 30
+    NO_DATA: Final[int] = -9999
 
     @staticmethod
     def is_platform(file_path: Union[Path, str]) -> bool:
@@ -80,7 +80,7 @@ class Landsat8:
 
         file_names: dict = extract_metadata(file_path, target_attributes)
 
-        band_names: List[cls.Bands] = [b.name for b in cls.Bands]
+        band_names: List[str] = [b.name for b in cls.Bands]
 
         return {k: v.strip('"') for k, v in zip(band_names, file_names.values())}
 
@@ -187,7 +187,7 @@ class Landsat8:
                 processed_band_array = celsius_array
 
             processed_band_array = np.where(
-                band_array == 0, NO_DATA, processed_band_array
+                band_array == 0, cls.NO_DATA, processed_band_array
             ).astype(np.int16)
 
             parameters["band_data"][band_name] = processed_band_array

@@ -3,7 +3,7 @@ from enum import Enum
 from enum import auto
 from os import stat
 from pathlib import Path
-from typing import Any
+from typing import Any, Final
 from typing import Dict
 from typing import List
 from typing import Union
@@ -14,7 +14,6 @@ from pyfmask.utils.classes import SensorData
 
 # from pyfmask.utils.classes import SupportedSensors
 from pyfmask.extractors.metadata import extract_metadata
-from pyfmask.raster_utilities.utils import NO_DATA
 
 
 class Sentinel2:
@@ -30,6 +29,7 @@ class Sentinel2:
         CIRRUS = 10
 
     RGB: tuple = (Bands.RED, Bands.GREEN, Bands.BLUE)
+    NO_DATA: Final[int] = -9999
 
     @staticmethod
     def is_platform(file_path: Union[Path, str]) -> bool:
@@ -61,7 +61,7 @@ class Sentinel2:
 
         file_names: dict = extract_metadata(file_path, target_attributes)
 
-        band_names: List[cls.Bands] = [b.name for b in cls.Bands]
+        band_names: List[str] = [b.name for b in cls.Bands]
         return {k: v for k, v in zip(band_names, file_names.values())}
 
     @classmethod
@@ -127,7 +127,7 @@ class Sentinel2:
             # Saturation of visible bands (RGB)
             ##
             if not hasattr(parameters, "vis_saturation"):
-                parameters.vis_saturation = np.zero(band_array.shape).astype(np.bool)
+                parameters.vis_saturation = np.zero(band_array.shape).astype(bool)
 
             if band in cls.RGB:
                 parameters.vis_saturation = np.where(
@@ -171,7 +171,7 @@ class Sentinel2:
             # Assign NoData
             ##
             processed_band_array = np.where(
-                band_array == 0, NO_DATA, band_array
+                band_array == 0, cls.NO_DATA, band_array
             ).astype(np.int16)
 
             ##

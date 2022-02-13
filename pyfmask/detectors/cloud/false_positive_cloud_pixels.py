@@ -9,6 +9,8 @@ from pyfmask.utils.classes import SensorData
 from skimage import morphology
 from skimage.filters import threshold_otsu
 
+np.seterr(divide="ignore")
+
 
 def detect_false_positive_cloud_pixels(
     band_data: Dict[str, np.ndarray],

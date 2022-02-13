@@ -1,4 +1,4 @@
-from typing import Optional, Union
+from typing import Optional, Tuple, Union
 from pyfmask.utils.classes import GSWOData
 import numpy as np
 
@@ -9,7 +9,7 @@ def detect_water(
     nodata_mask: np.ndarray,
     snow: Optional[np.ndarray] = None,
     gswo_data: Optional[GSWOData] = None,
-) -> np.ndarray:
+) -> Tuple[np.ndarray, np.ndarray]:
 
     water: np.ndarray = np.zeros(nir.shape).astype(bool)
     gswo: Optional[np.ndarray] = gswo_data.gswo if gswo_data is not None else None
@@ -35,7 +35,7 @@ def detect_water(
     # global surface water occurance (GSWO)
     # low level to exclude the commssion errors as water.
     # 5% tolerances
-    mm: np.ndarray = [water == 1]
+    mm: np.ndarray = water[water == 1]
     if np.sum(mm) > 0:
         gswater_occur = (
             np.percentile(gswo[water == 1], 17.5) - 5
@@ -61,4 +61,4 @@ def detect_water(
 
     print("WATER", np.sum(water))
 
-    return water
+    return water, all_water

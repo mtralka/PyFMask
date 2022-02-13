@@ -1,11 +1,9 @@
-from enum import auto
-from logging.config import valid_ident
 from pathlib import Path
+from shutil import rmtree
 from typing import Any
 from typing import Dict
 from typing import Optional
 from typing import Union
-from typing import ValuesView
 from typing import cast
 
 import gdalconst
@@ -15,8 +13,10 @@ from pyfmask.detectors import detect_absolute_snow
 from pyfmask.detectors import detect_snow
 from pyfmask.detectors import detect_water
 from pyfmask.detectors.cloud import detect_false_positive_cloud_pixels
-from pyfmask.detectors.cloud import detect_potential_clouds
 from pyfmask.detectors.cloud import detect_potential_cloud_pixels
+from pyfmask.detectors.cloud import detect_potential_clouds
+from pyfmask.detectors.cloud_shadow import detect_potential_cloud_shadow_pixels
+from pyfmask.detectors.cloud_shadow import match_cloud_shadows
 from pyfmask.extractors.auxillary_data import AuxTypes
 from pyfmask.extractors.auxillary_data import extract_aux_data
 from pyfmask.platforms.landsat8 import Landsat8
@@ -45,18 +45,21 @@ class fmask:
         out_name: str,
         dem_path: Union[Path, str],
         gswo_path: Union[Path, str],
-        cloud_threshold: Optional[Union[float, int]] = None,
         dilated_cloud_px: int = 3,
         dilated_shadow_px: int = 3,
         dilated_snow_px: int = 0,
-        output_cloud_prob: bool = True,
         dem_nodata: Union[float, int] = -9999,
         gswo_nodata: Union[float, int] = 255,
+        auto_run: bool = False,
         auto_save: bool = True,
+        delete_temp_dir: bool = False,
+        save_cloud_prob: bool = True,
     ):
         self.infile: Path = valdiate_path(infile, check_exists=True, check_is_file=True)
+
         self.out_dir: Path = valdiate_path(out_dir, check_is_dir=True)
         self.out_name: str = out_name
+
         self.dem_path: Path = valdiate_path(
             dem_path, check_exists=True, check_is_dir=True
         )
@@ -65,15 +68,13 @@ class fmask:
         )
 
         self.auto_save: bool = auto_save
-
-        if cloud_threshold:
-            self.cloud_threshold: float = float(cloud_threshold)
+        self.delete_temp_dir: bool = delete_temp_dir
 
         self.dilated_cloud_px: int = dilated_cloud_px
         self.dilated_shadow_px: int = dilated_shadow_px
         self.dilated_snow_px: int = dilated_snow_px
 
-        self.output_cloud_prob: bool = output_cloud_prob
+        self.save_cloud_prob: bool = save_cloud_prob
 
         self.dem_nodata: Union[float, int] = dem_nodata
         self.gswo_nodata: Union[float, int] = gswo_nodata
@@ -101,18 +102,37 @@ class fmask:
 
         self.results: np.ndarray
 
+        if auto_run:
+            self.run()
+
+    @property
+    def outfile_path(self) -> str:
+        return str(self.out_dir / self.out_name)
+
     def run(self) -> None:
 
+        ##
+        # Extract platform data
+        ##
         self._extract_platform_data()
 
+        ##
+        # Create temporary directory for intermediate files
+        ##
         self.temp_dir = self._create_temp_directory()
 
+        ##
+        # Extract DEM data
+        ##
         self._extract_dem_data()
 
+        ##
+        # Create requisite spectral composites
+        ##
         self._create_spectral_composites()
 
         ##
-        # Detect snow pixels
+        # Detect snow area
         ##
         self.snow = detect_snow(
             self.ndsi,
@@ -120,47 +140,24 @@ class fmask:
         )
 
         ##
-        # Detect water pixels
+        # Detect water area
         ##
-        self.water = detect_water(
+        self.water, self.all_water = detect_water(
             self.platform_data.band_data["NIR"],
             self.ndvi,
             self.platform_data.nodata_mask,
             self.snow,
             cast(GSWOData, self.gswo_data),
-        )  # TODO adjust this
+        )
 
         ##
         # Calculate CDI if platform is S2
         ##
-        # TODO test this
         if self.platform_data.sensor == "S2_MSI":
             self.cdi = create_cdi(
                 self.platform_data.band_data["NIR"],
                 self.platform_data.band_data["NIR2"],
                 self.platform_data.band_data["RED3"],
-            )
-
-        ##
-        # Detect potential cloud pixels
-        ##
-        self.potential_cloud_pixels = detect_potential_cloud_pixels(
-            ndsi=self.ndsi,
-            ndvi=self.ndvi,
-            band_data=self.platform_data.band_data,
-            vis_saturation=self.platform_data.vis_saturation,
-            dem_data=self.dem_data,
-            nodata_mask=self.platform_data.nodata_mask,
-        )
-
-        print("probable clouds", np.sum(self.potential_cloud_pixels.potential_pixels))
-
-        ##
-        # Update cirrus clouds
-        ##
-        if self.platform_data.band_data.get("CIRRUS", None) is not None:
-            self.platform_data.band_data["CIRRUS"] = cast(
-                np.ndarray, self.potential_cloud_pixels.normalized_cirrus
             )
 
         ##
@@ -175,22 +172,22 @@ class fmask:
         )
 
         ##
-        # Run cloud detection processes
+        # Detect cloud area
         ##
-        self._run_cloud_computations()
+        self._run_cloud_detection()
 
         ##
-        # Cloud shadow detection
+        # Detect cloud shadow area
         ##
-        self._run_cloud_shadow_computations()
+        self._run_cloud_shadow_detection()
 
         ##
         # Dilate snow, shadows, and clouds
         ##
         if self.dilated_snow_px > 0:
             self.snow = dilate_array(self.snow, self.dilated_snow_px)
-        # if self.dilated_shadow_px > 0:
-        # self.cloud_shadow = dilate_array(self.cloud_shadow, self.dilated_shadow_px)
+        if self.dilated_shadow_px > 0:
+            self.cloud_shadow = dilate_array(self.cloud_shadow, self.dilated_shadow_px)
         if self.dilated_cloud_px > 0:
             self.cloud = dilate_array(self.cloud, self.dilated_cloud_px)
 
@@ -201,6 +198,9 @@ class fmask:
 
         if self.auto_save:
             self.save_results()
+
+        if self.delete_temp_dir:
+            rmtree(self.temp_dir, ignore_errors=True)
 
     def _extract_platform_data(self) -> None:
         """Extract platform data"""
@@ -248,6 +248,7 @@ class fmask:
         self.gswo_data = cast(GSWOData, gswo_data) if gswo_data else None
 
     def _create_spectral_composites(self) -> None:
+        """Create `ndvi`, `ndsi`, and `ndbi`"""
 
         self.ndvi = create_ndvi(
             self.platform_data.band_data["RED"], self.platform_data.band_data["NIR"]
@@ -260,6 +261,7 @@ class fmask:
         )
 
     def _create_temp_directory(self) -> Path:
+        """Create temporary directory"""
 
         temp_name: str = str(self.platform_data.scene_id) + "_temp"
         outfile_path: Path = self.out_dir / temp_name
@@ -271,11 +273,31 @@ class fmask:
 
         return outfile_path
 
-    def _run_cloud_computations(self) -> None:
+    def _run_cloud_detection(self) -> None:
         """Run cloud detection pipeline"""
 
         ##
-        # Detect probable clouds
+        # Detect potential cloud pixels
+        ##
+        self.potential_cloud_pixels = detect_potential_cloud_pixels(
+            ndsi=self.ndsi,
+            ndvi=self.ndvi,
+            band_data=self.platform_data.band_data,
+            vis_saturation=self.platform_data.vis_saturation,
+            dem_data=self.dem_data,
+            nodata_mask=self.platform_data.nodata_mask,
+        )
+
+        ##
+        # Update cirrus clouds
+        ##
+        if self.platform_data.band_data.get("CIRRUS") is not None:
+            self.platform_data.band_data["CIRRUS"] = cast(
+                np.ndarray, self.potential_cloud_pixels.normalized_cirrus
+            )
+
+        ##
+        # Detect potential clouds
         ##
         self.potential_clouds = detect_potential_clouds(
             self.platform_data.band_data,
@@ -313,18 +335,16 @@ class fmask:
         ##
         # Detect potential false positives in cloud layer
         ##
-        potential_false_positives: np.ndarray = (
-            detect_false_positive_cloud_pixels(
-                self.platform_data.band_data,
-                self.ndbi,
-                self.ndvi,
-                self.platform_data,
-                self.snow,
-                self.water,
-                self.potential_clouds.cloud,
-                self.cdi,
-                self.dem_data,
-            )
+        potential_false_positives: np.ndarray = detect_false_positive_cloud_pixels(
+            self.platform_data.band_data,
+            self.ndbi,
+            self.ndvi,
+            self.platform_data,
+            self.snow,
+            self.water,
+            self.potential_clouds.cloud,
+            self.cdi,
+            self.dem_data,
         )
 
         ##
@@ -338,30 +358,42 @@ class fmask:
             self.platform_data.erode_pixels,
         )
 
-    def _run_cloud_shadow_computations(self) -> None:
+    def _run_cloud_shadow_detection(self, pixel_limit: int = 40000) -> None:
+        """Run cloud shadow detection pipeline"""
 
-        # shadow_matched = np.zeros(cs_final.shape, np.uint8)
+        # self.cloud_shadow: np.ndarray = np.zeros(self.platform_data.band_data["RED"].shape, np.uint8)
 
-        #     # Shadow detection
-        # if (sum_clr <= 40000):
-        #     print(f'No clear pixel in this image (clear-sky pixels = {sum_clr})')
-        #     pcloud = (pcloud>0)
-        #     pshadow = np.where(pcloud==0,1,0)
-        #     shadow_matched = pshadow
-        # else:
-        #     print('Match cloud shadows with clouds')
-        #     # detect potential cloud shadow
-        #     t0 = time.time()
+        if self.potential_clouds.sum_clear_pixels < pixel_limit:
 
-        #     # Performing potential shadows search
-        #     pshadow = detect_potential_cloud_shadow(data, idlnd)
-        #     # Performaing shadows matching
-        #     shadow_matched = match_cloud_shadow(data, pcloud, pshadow, water_all, sum_clr, t_templ, t_temph)
+            # matched_shadows = np.where(self.cloud < 0, np.nan, self.cloud)
+            self.cloud_shadow = np.where(self.cloud == 0, 1, 0)
+            return
 
-        #     print(f'Processing time of shadow detection: {time.time()-t0} sec')
-        ...
+        ##
+        # Find potential cloud shadow pixels
+        ##
+        potential_cloud_shadow_pixels: np.ndarray = (
+            detect_potential_cloud_shadow_pixels(
+                self.platform_data, self.dem_data, self.potential_clouds.clear_land
+            )
+        )
+
+        ##
+        # Match potential cloud shadow pixels to clouds
+        ##
+        self.cloud_shadow = match_cloud_shadows(
+            self.cloud,
+            self.potential_clouds.sum_clear_pixels,
+            self.all_water,
+            potential_cloud_shadow_pixels,
+            self.platform_data,
+            self.dem_data,
+            self.potential_clouds.temp_test_low,
+            self.potential_clouds.temp_test_high,
+        )
 
     def _compute_final_results(self) -> None:
+        """Compute final fmask array results"""
 
         final_array: np.ndarray = np.zeros(
             self.potential_clouds.cloud.shape, dtype=np.uint8
@@ -370,7 +402,6 @@ class fmask:
         ##
         # Water
         ##
-        # final_array = np.where(self.water==1, 1, final_array) TODO
         final_array = np.where(self.water > 0, 1, final_array)
 
         ##
@@ -379,9 +410,9 @@ class fmask:
         final_array = np.where(self.snow > 0, 3, final_array)
 
         ##
-        # Shadow
+        # Cloud Shadow
         ##
-        # final_array = np.where(shadow_matched > 0, 2, final_array)
+        final_array = np.where(self.cloud_shadow > 0, 2, final_array)
 
         ##
         # Cloud
@@ -396,19 +427,56 @@ class fmask:
         self.results = final_array
 
     def save_results(self) -> None:
+        """Save `self.final_array` to `self.outfile_path`"""
 
         ##
-        # Make output folder
+        # Save fmask `self.results`
         ##
+        self.save_array_to_file(
+            self.results,
+            self.outfile_path,
+        )
+
+        ##
+        # [Optional] Save cloud probability
+        ##
+        if self.save_cloud_prob:
+            cloud_probability: np.ndarray = np.where(
+                self.water == 1,
+                self.potential_clouds.over_water_probability,
+                self.potential_clouds.over_land_probability,
+            )
+            cloud_probability = np.where(cloud_probability < 0, 0, cloud_probability)
+            cloud_probability = np.where(
+                cloud_probability > 100, 100, cloud_probability
+            )
+            cloud_probability = np.where(
+                self.platform_data.nodata_mask, 255, cloud_probability
+            )
+
+            outfile_path = self.outfile_path
+            if outfile_path[-4:] == ".tif":
+                outfile_path = self.outfile_path[0:-4]
+
+            outfile_path += "_cloud-probability.tif"
+
+            self.save_array_to_file(
+                cloud_probability,
+                outfile_path,
+            )
+
+    def save_array_to_file(
+        self,
+        array: np.ndarray,
+        file_path: str,
+    ) -> None:
+        """Save `array` to `file_path` using `self` raster paramters"""
 
         x_size: int = self.potential_clouds.cloud.shape[1]
         y_size: int = self.potential_clouds.cloud.shape[0]
-        outfile_path: str = str(self.out_dir / self.out_name)
-        ##
-        # Create output dataset
-        ##
+
         outfile_ds = create_outfile_dataset(
-            outfile_path,
+            file_path,
             x_size,
             y_size,
             self.platform_data.projection_reference,
@@ -416,10 +484,5 @@ class fmask:
             1,
             data_type=gdalconst.GDT_Byte,
         )
-        outfile_ds = write_array_to_ds(outfile_ds, self.results)
+        outfile_ds = write_array_to_ds(outfile_ds, array)
         outfile_ds = None
-        # if save probability of clouds
-
-        # delete temporal folder if exists
-
-        ...

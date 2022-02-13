@@ -36,7 +36,9 @@ def detect_potential_clouds(
 
     potential_clouds = np.zeros(nir.shape, dtype=np.uint8)
 
-    idused: Optional[np.ndarray] = None
+    # idused: Optional[np.ndarray] = None
+    idused: np.ndarray = np.zeros(nir.shape)
+
     bt_normalized_dem: Optional[np.ndarray] = None
 
     clear_pixels: np.ndarray = (potential_cloud_pixels.potential_pixels == False) & (
@@ -66,6 +68,7 @@ def detect_potential_clouds(
         return PotentialClouds(
             sum_clear_pixels=sum_clear_pixels,
             cloud=potential_clouds,
+            clear_land=idused,
             over_water_probability=over_land_water_probability,
             over_land_probability=over_land_water_probability,
         )
@@ -110,9 +113,13 @@ def detect_potential_clouds(
     # if BT is not available, use HOT probability
     else:
 
-        land_probability_brightness = probl_brightness(
+        land_probability_brightness = land_brightness_probability_hot(
             potential_cloud_pixels.hot, idused, low_percent, high_percent
         )
+
+        # land_probability_brightness = probl_brightness(
+        #     potential_cloud_pixels.hot, idused, low_percent, high_percent
+        # )
 
     over_land_probability_variance: np.ndarray = spectral_variance_probability(
         ndsi, ndvi, ndbi, vis_saturation, potential_cloud_pixels.whiteness
@@ -141,7 +148,7 @@ def detect_potential_clouds(
         over_water_probability_temperature * over_water_probability_brightness
         + thin_cirrus_weight * probability_thin_cloud
     )
-    over_water_probability = 100.0 * over_water_probability  # convert percentage
+    over_water_probability = 100.0 * over_water_probability
 
     if np.sum(clear_water_mask == True) > 0:
         wclr_h = np.percentile(
@@ -187,42 +194,11 @@ def detect_potential_clouds(
         cloud=potential_clouds,
         temp_test_low=temp_test_low,
         temp_test_high=temp_test_high,
+        clear_land=idused,
         bt_normalized_dem=bt_normalized_dem,
         over_land_probability=over_land_probability,
         over_water_probability=over_water_probability,
     )
-
-
-def probw_temperature(bt, clear_water_mask, high_percent):
-    # calculate temperature probability for water
-
-    # get BT (array of pixels) for clear water pixel
-    f_wtemp = bt[clear_water_mask]
-
-    # taking percentile
-    t_wtemp = np.percentile(f_wtemp, 100 * high_percent)  # Eq. 8 (Zhu 2012)
-
-    # offsetting the temperature and dividing by 4degC
-    over_water_probability_temperature = (t_wtemp - bt) / 400  # Eq. 9 (Zhu 2012)
-    over_water_probability_temperature = np.where(
-        over_water_probability_temperature < 0, 0, over_water_probability_temperature
-    )
-
-    return over_water_probability_temperature
-
-
-def probw_brightness(swir1):
-    # calculate brightness probability over water
-    t_bright = 1100
-    over_water_probability_brightness = swir1 / t_bright  # Eq. 10 (Zhu 2012)
-    over_water_probability_brightness = np.where(
-        over_water_probability_brightness > 1, 1, over_water_probability_brightness
-    )
-    over_water_probability_brightness = np.where(
-        over_water_probability_brightness < 0, 0, over_water_probability_brightness
-    )
-
-    return over_water_probability_brightness
 
 
 def normalize_bt(bt, dem, idused, low_percent, high_percent):
@@ -294,74 +270,6 @@ def normalize_bt(bt, dem, idused, low_percent, high_percent):
             norm_bt = np.where(dem_mask, bt - rate_lapse * (dem - dem_b), bt)
 
     return norm_bt
-
-
-def probl_temperature(bt, clear_pixels, low_percent, high_percent):
-    # [Temperature test (over land)]
-
-    # get BT (array of pixels) for clear land pixel
-    f_temp = bt[clear_pixels]
-    t_buffer = 4 * 100
-
-    # 0.175 percentile background temperature (low)
-    temp_test_low = np.percentile(f_temp, 100 * low_percent)  # Eq. 12-13 (Zhu 2012)
-
-    # 0.825 percentile background temperature (high)
-    temp_test_high = np.percentile(f_temp, 100 * high_percent)  # Eq. 12-13 (Zhu 2012)
-
-    temp_test_low = temp_test_low - t_buffer
-    temp_test_high = temp_test_high + t_buffer
-
-    temp_l = temp_test_high - temp_test_low
-
-    prob_temp = (temp_test_high - bt) / temp_l  # Eq. 14 (Zhu 2012)
-
-    # Temperature can have prob > 1
-    prob_temp = np.where(prob_temp < 0, 0, prob_temp)
-
-    return prob_temp, temp_test_low, temp_test_high
-
-
-def probl_brightness(hot, clear_land_mask, low_percent, high_percent):
-    # calculate brightness probability using HOT
-
-    # get array of hot over clear pixels
-    f_hot = hot[clear_land_mask]
-
-    # 0.175 percentile background HOT (low)
-    t_hotl = np.percentile(f_hot, 100 * low_percent) - 400
-    # 0.825 percentile background HOT (high)
-    t_hoth = np.percentile(f_hot, 100 * high_percent) + 400
-
-    prob_brightness = (hot - t_hotl) / (t_hoth - t_hotl)
-    prob_brightness = np.where(prob_brightness < 0, 0, prob_brightness)
-    # this cannot be higher 1 (maybe have commission errors from bright surfaces).
-    prob_brightness = np.where(prob_brightness > 1, 1, prob_brightness)
-
-    return prob_brightness
-
-
-def probl_spectral_varibility(data, pcp):
-    # [varibility test over land]
-    ndsi = np.where(
-        (data["vis_saturation"] == True) & (data["ndsi"] < 0), 0, data["ndsi"]
-    )
-    ndvi = np.where(
-        (data["vis_saturation"] == True) & (data["ndvi"] > 0), 0, data["ndvi"]
-    )  # (SatuRed==true&ndvi>0)=0;
-
-    ndsi = np.absolute(ndsi)
-    ndvi = np.absolute(ndvi)
-    ndbi = np.absolute(data["ndbi"])
-
-    over_land_probability_variance = 1 - np.maximum(
-        np.maximum(np.maximum(ndsi, ndvi), ndbi), pcp["whiteness"]
-    )  # Eq. 15 with added NDBI (Zhe 2012)
-
-    return over_land_probability_variance
-
-
-## NEW
 
 
 def water_temperature_probability(
@@ -436,6 +344,35 @@ def land_temperature_probability(
     )
 
     return probability_temperature, temp_test_low, temp_test_high
+
+
+def land_brightness_probability_hot(
+    hot: np.ndarray, idused: np.ndarray, low_percent: float, high_percent: float
+) -> np.ndarray:
+    """Calculate land brightness probability using HOT"""
+
+    over_clear_land_pixels: np.ndarray = hot[idused]
+
+    low_hot_percentile: np.ndarray = (
+        np.percentile(over_clear_land_pixels, 100 * low_percent) - 400
+    )
+    high_hot_percentile: np.ndarray = (
+        np.percentile(over_clear_land_pixels, 100 * high_percent) + 400
+    )
+
+    probability_brightness: np.ndarray = (hot - low_hot_percentile) / (
+        high_hot_percentile - low_hot_percentile
+    )
+    probability_brightness = np.where(
+        probability_brightness < 0, 0, probability_brightness
+    )
+
+    # probability_brightness(i)(n) cannot be higher than 1
+    probability_brightness = np.where(
+        probability_brightness > 1, 1, probability_brightness
+    )
+
+    return probability_brightness
 
 
 def spectral_variance_probability(
