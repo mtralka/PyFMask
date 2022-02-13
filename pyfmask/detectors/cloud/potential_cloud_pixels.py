@@ -6,6 +6,10 @@ import numpy as np
 from pyfmask.utils.classes import DEMData
 from pyfmask.utils.classes import PotentialCloudPixels
 
+import logging.config
+
+logger = logging.getLogger(__name__)
+
 
 def detect_potential_cloud_pixels(
     ndsi: np.ndarray,
@@ -89,6 +93,8 @@ def detect_potential_cloud_pixels(
         potential_pixels = (potential_pixels == True) | (
             normalized_cirrus > normalized_cirrus_limit
         )
+
+    logger.debug("%s potential cloud pixels", np.sum(potential_pixels))
 
     data: PotentialCloudPixels = PotentialCloudPixels(
         potential_pixels=potential_pixels,

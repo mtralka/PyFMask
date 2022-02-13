@@ -113,8 +113,7 @@ def erode_commissons(
     ##
     # Remove small object with CDI < -0.5, only for Sentinel 2
     ##
-
-    large_objects: np.ndarray = morphology.remove_small_objectsects(
+    large_objects: np.ndarray = morphology.remove_small_objects(
         cloud.astype(bool), 10000, connectivity=2
     )
 
@@ -145,6 +144,6 @@ def erode_commissons(
     ##
     # Remove very small objects
     ##
-    cloud = morphology.remove_small_objectsects(cloud.astype(bool), 3, connectivity=2)
+    cloud = morphology.remove_small_objects(cloud.astype(bool), 3, connectivity=2)
 
     return cloud

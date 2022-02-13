@@ -1,3 +1,6 @@
+from importlib import resources
+import json
+import logging.config
 from pathlib import Path
 from shutil import rmtree
 from typing import Any
@@ -5,6 +8,7 @@ from typing import Dict
 from typing import Optional
 from typing import Union
 from typing import cast
+import time
 
 import gdalconst
 import numpy as np
@@ -20,6 +24,7 @@ from pyfmask.detectors.cloud_shadow import match_cloud_shadows
 from pyfmask.extractors.auxillary_data import AuxTypes
 from pyfmask.extractors.auxillary_data import extract_aux_data
 from pyfmask.platforms.landsat8 import Landsat8
+from pyfmask.platforms.sentinel2 import Sentinel2
 from pyfmask.raster_utilities.composites import create_cdi
 from pyfmask.raster_utilities.composites import create_ndbi
 from pyfmask.raster_utilities.composites import create_ndsi
@@ -36,20 +41,29 @@ from pyfmask.utils.classes import PotentialClouds
 from pyfmask.utils.classes import SensorData
 from pyfmask.utils.utils import valdiate_path
 
+with resources.path("pyfmask", "loggingConfig.json") as p:
+    logging_config_path: str = str(p)
 
-class fmask:
+with open(logging_config_path, "rt") as file:
+    logging.config.dictConfig(json.load(file))
+
+logger = logging.getLogger(__name__)
+
+
+class FMask:
     def __init__(
         self,
         infile: Union[Path, str],
         out_dir: Union[Path, str],
         out_name: str,
-        dem_path: Union[Path, str],
         gswo_path: Union[Path, str],
+        dem_path: Optional[Union[Path, str]] = None,
         dilated_cloud_px: int = 3,
         dilated_shadow_px: int = 3,
         dilated_snow_px: int = 0,
         dem_nodata: Union[float, int] = -9999,
         gswo_nodata: Union[float, int] = 255,
+        use_mapzen: bool = True,
         auto_run: bool = False,
         auto_save: bool = True,
         delete_temp_dir: bool = False,
@@ -60,12 +74,24 @@ class fmask:
         self.out_dir: Path = valdiate_path(out_dir, check_is_dir=True)
         self.out_name: str = out_name
 
-        self.dem_path: Path = valdiate_path(
-            dem_path, check_exists=True, check_is_dir=True
-        )
         self.gswo_path: Path = valdiate_path(
             gswo_path, check_exists=True, check_is_dir=True
         )
+
+        self.dem_path: Optional[Path] = None
+        if dem_path:
+            self.dem_path = valdiate_path(
+                dem_path, check_exists=True, check_is_dir=True
+            )
+
+        if not use_mapzen and not dem_path:
+            logger.error(
+                "Must select `use_mapzen` or provide a local `dem_path`",
+                stack_info=True,
+            )
+            raise ValueError("Must select `use_mapzen` or provide a local `dem_path`")
+
+        self.use_mapzen: bool = use_mapzen
 
         self.auto_save: bool = auto_save
         self.delete_temp_dir: bool = delete_temp_dir
@@ -111,6 +137,10 @@ class fmask:
 
     def run(self) -> None:
 
+        logger.info("Starting FMask")
+
+        start_time: float = time.time()
+
         ##
         # Extract platform data
         ##
@@ -134,6 +164,7 @@ class fmask:
         ##
         # Detect snow area
         ##
+        logger.info("Starting snow detection")
         self.snow = detect_snow(
             self.ndsi,
             band_data=self.platform_data.band_data,
@@ -142,6 +173,7 @@ class fmask:
         ##
         # Detect water area
         ##
+        logger.info("Starting water detection")
         self.water, self.all_water = detect_water(
             self.platform_data.band_data["NIR"],
             self.ndvi,
@@ -163,6 +195,7 @@ class fmask:
         ##
         # Detect absolute snow (pure snow / ice)
         ##
+        logger.info("Starting absolute snow detection")
         self.absolute_snow = detect_absolute_snow(
             self.platform_data.sensor,
             self.snow,
@@ -196,28 +229,42 @@ class fmask:
         ##
         self._compute_final_results()
 
+        logger.info("Completed FMask run in %s seconds", time.time() - start_time)
+
         if self.auto_save:
             self.save_results()
 
         if self.delete_temp_dir:
+            logger.debug("Removing temporary directory at %s", self.temp_dir)
             rmtree(self.temp_dir, ignore_errors=True)
+
+        return None
 
     def _extract_platform_data(self) -> None:
         """Extract platform data"""
-        supported_platforms: Dict[str, Any] = {"Landsat8": Landsat8}
+
+        supported_platforms: Dict[str, Any] = {
+            "Landsat8": Landsat8,
+            "Sentinel2": Sentinel2,
+        }
 
         for name, platform_object in supported_platforms.items():
             if platform_object.is_platform(self.infile):
-                print(f"Identified as {name}")
-                self.platform_data = platform_object.get_data(
-                    self.infile
-                )  # TODO something withh threshold class attrs
+
+                logging.info("Identified as %s", name)
+
+                self.platform_data = platform_object.get_data(self.infile)
                 break
         else:
+            logger.error("Platform not found or supported", stack_info=True)
             raise ValueError("Platform not found or supported")
+
+        return None
 
     def _extract_dem_data(self) -> None:
         """Extract data from DEMs and GSWOs"""
+
+        logger.info("Extracting auxillary DEM and GSWO Data")
 
         aux_data_kwargs: Dict[str, Any] = {
             "projection_reference": self.platform_data.projection_reference,
@@ -229,12 +276,32 @@ class fmask:
             "temp_dir": self.temp_dir,
         }
 
+        initial_dem_type: AuxTypes = (
+            AuxTypes.MAPZEN if self.use_mapzen else AuxTypes.DEM
+        )
         dem_data = extract_aux_data(
             aux_path=self.dem_path,
-            aux_type=AuxTypes.DEM,
+            aux_type=initial_dem_type,
             no_data=self.dem_nodata,
             **aux_data_kwargs,
         )
+
+        ##
+        # Retry DEM collection with local if MAPZEN failed
+        # and local `self.dem_data` path was given
+        ##
+        if (
+            not dem_data
+            and initial_dem_type is AuxTypes.MAPZEN
+            and self.dem_data is not None
+        ):
+            logger.info("Failed Mapzen, using local DEM")
+            dem_data = extract_aux_data(
+                aux_path=self.dem_path,
+                aux_type=AuxTypes.DEM,
+                no_data=self.dem_nodata,
+                **aux_data_kwargs,
+            )
 
         self.dem_data = cast(DEMData, dem_data) if dem_data else None
 
@@ -247,8 +314,12 @@ class fmask:
 
         self.gswo_data = cast(GSWOData, gswo_data) if gswo_data else None
 
+        return None
+
     def _create_spectral_composites(self) -> None:
         """Create `ndvi`, `ndsi`, and `ndbi`"""
+
+        logger.info("Creating spectral composites")
 
         self.ndvi = create_ndvi(
             self.platform_data.band_data["RED"], self.platform_data.band_data["NIR"]
@@ -260,6 +331,8 @@ class fmask:
             self.platform_data.band_data["SWIR1"], self.platform_data.band_data["NIR"]
         )
 
+        return None
+
     def _create_temp_directory(self) -> Path:
         """Create temporary directory"""
 
@@ -267,7 +340,7 @@ class fmask:
         outfile_path: Path = self.out_dir / temp_name
 
         if outfile_path.exists():
-            print("WARN, outfile path exists, rewriting")
+            logger.debug("Outfile path exists, rewriting")
 
         outfile_path.mkdir(exist_ok=True)
 
@@ -275,6 +348,8 @@ class fmask:
 
     def _run_cloud_detection(self) -> None:
         """Run cloud detection pipeline"""
+
+        logger.info("Starting cloud detection")
 
         ##
         # Detect potential cloud pixels
@@ -312,9 +387,6 @@ class fmask:
             self.ndbi,
             self.platform_data.vis_saturation,
         )
-
-        # logged
-        # t_templ, t_temph
 
         ##
         # Update DEM normalized BT clouds
@@ -358,14 +430,18 @@ class fmask:
             self.platform_data.erode_pixels,
         )
 
+        logger.debug("Finished cloud detection")
+
+        return None
+
     def _run_cloud_shadow_detection(self, pixel_limit: int = 40000) -> None:
         """Run cloud shadow detection pipeline"""
 
-        # self.cloud_shadow: np.ndarray = np.zeros(self.platform_data.band_data["RED"].shape, np.uint8)
+        logger.info("Starting cloud shadow detection")
 
         if self.potential_clouds.sum_clear_pixels < pixel_limit:
 
-            # matched_shadows = np.where(self.cloud < 0, np.nan, self.cloud)
+            logger.debug("No clear pixels in image")
             self.cloud_shadow = np.where(self.cloud == 0, 1, 0)
             return
 
@@ -391,6 +467,10 @@ class fmask:
             self.potential_clouds.temp_test_low,
             self.potential_clouds.temp_test_high,
         )
+
+        logger.debug("Finished cloud shadow detection")
+
+        return None
 
     def _compute_final_results(self) -> None:
         """Compute final fmask array results"""
@@ -426,8 +506,12 @@ class fmask:
 
         self.results = final_array
 
+        return None
+
     def save_results(self) -> None:
         """Save `self.final_array` to `self.outfile_path`"""
+
+        logger.info("Saving results")
 
         ##
         # Save fmask `self.results`
@@ -440,6 +524,7 @@ class fmask:
         ##
         # [Optional] Save cloud probability
         ##
+        logger.debug("Saving cloud probability %s", self.save_cloud_prob)
         if self.save_cloud_prob:
             cloud_probability: np.ndarray = np.where(
                 self.water == 1,
@@ -465,6 +550,8 @@ class fmask:
                 outfile_path,
             )
 
+        return None
+
     def save_array_to_file(
         self,
         array: np.ndarray,
@@ -486,3 +573,7 @@ class fmask:
         )
         outfile_ds = write_array_to_ds(outfile_ds, array)
         outfile_ds = None
+
+        logger.debug("Saved array to %s", file_path)
+
+        return None

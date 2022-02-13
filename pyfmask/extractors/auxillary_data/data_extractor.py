@@ -1,28 +1,30 @@
-from os import path
+import logging.config
+from multiprocessing.sharedctypes import Value
 from pathlib import Path
 from types import FunctionType
 from typing import Any
-from typing import Callable
-from typing import Dict
 from typing import Final
-from typing import List
 from typing import Optional
 from typing import Union
+from typing import cast
 
 import gdal
 import numpy as np
 import osr
-from pyfmask.extractors.auxillary_data.dataset_creator import create_aux_dataset
+from pyfmask.extractors.auxillary_data.dataset_creator import create_local_aux_dataset
+from pyfmask.extractors.auxillary_data.dataset_creator import create_mapzen_dataset
 from pyfmask.extractors.auxillary_data.types import AuxTypes
 from pyfmask.utils.classes import DEMData
 from pyfmask.utils.classes import GSWOData
 
 
+logger = logging.getLogger(__name__)
+
 RESAMPLING_METHOD: Final[str] = "bilinear"
 
 
 def extract_aux_data(
-    aux_path: Path,
+    aux_path: Optional[Path],
     aux_type: AuxTypes,
     projection_reference: tuple,
     x_size: int,
@@ -39,24 +41,43 @@ def extract_aux_data(
             f"`aux_type` must be one of {','.join([a.name for a in AuxTypes])}"
         )
 
-    ds = create_aux_dataset(
-        aux_path,
-        aux_type,
-        projection_reference,
-        x_size,
-        y_size,
-        geo_transform,
-        out_resolution,
-        scene_id,
-        no_data,
-        temp_dir,
-    )
+    if aux_type == AuxTypes.MAPZEN:
+        logger.info("Using MAPZEN DEM")
+        ds = create_mapzen_dataset(
+            projection_reference,
+            x_size,
+            y_size,
+            geo_transform,
+            out_resolution,
+            scene_id,
+            no_data,
+            temp_dir,
+        )
+    elif aux_type is not AuxTypes.MAPZEN and aux_path is not None:
+        ds = create_local_aux_dataset(
+            cast(Path, aux_path),
+            aux_type,
+            projection_reference,
+            x_size,
+            y_size,
+            geo_transform,
+            out_resolution,
+            scene_id,
+            no_data,
+            temp_dir,
+        )
+    else:
+        logger.error(
+            "`aux_path` must be given if not using `AuxType.MAPZEN`", stack_info=True
+        )
+        raise ValueError("`aux_path` must be given if not using `AuxType.MAPZEN`")
 
     if ds is None:
         return None
 
-    data_extractors: Dict[Any, Callable[[Any, str, Path], Union[DEMData, GSWOData]]] = {
+    data_extractors: dict = {
         AuxTypes.DEM: extract_dem_data,
+        AuxTypes.MAPZEN: extract_dem_data,
         AuxTypes.GSWO: extract_gswo_data,
     }
 
@@ -90,7 +111,7 @@ def extract_dem_data(ds, scene_id: str, temp_dir: Path) -> DEMData:
 
     ds = None
 
-    print("GOT ", str(temp_dir / aspect_name))
+    logger.debug("Retrieved DEM from %s", str(temp_dir / aspect_name))
 
     return DEMData(dem=dem_arr, slope=slope_arr, aspect=aspect_arr)
 

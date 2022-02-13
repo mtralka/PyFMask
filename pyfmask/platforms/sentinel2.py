@@ -1,22 +1,23 @@
-from dataclasses import dataclass
 from enum import Enum
-from enum import auto
-from os import stat
+import logging.config
 from pathlib import Path
-from typing import Any, Final
+from typing import Any
 from typing import Dict
-from typing import List
 from typing import Union
+from skimage.measure import block_reduce
 
 import gdal
 import numpy as np
+from pyfmask.extractors.metadata import extract_metadata
+from pyfmask.platforms.platform_base import PlatformBase
+from pyfmask.platforms.platform_utils import calculate_erosion_pixels
 from pyfmask.utils.classes import SensorData
 
-# from pyfmask.utils.classes import SupportedSensors
-from pyfmask.extractors.metadata import extract_metadata
+
+logger = logging.getLogger(__name__)
 
 
-class Sentinel2:
+class Sentinel2(PlatformBase):
     class Bands(Enum):
         BLUE = 2
         GREEN = 3
@@ -29,14 +30,26 @@ class Sentinel2:
         CIRRUS = 10
 
     RGB: tuple = (Bands.RED, Bands.GREEN, Bands.BLUE)
-    NO_DATA: Final[int] = -9999
+    RESAMPLE_BANDS: tuple = (
+        Bands.RED,
+        Bands.GREEN,
+        Bands.BLUE,
+        Bands.NIR,
+        Bands.CIRRUS,
+    )
+
+    CLOUD_THRESHOLD: float = 20
+    PROBABILITY_WEIGHT: float = 0.5  # for thin/cirrus clouds
+    OUT_RESOLUTION: int = 20
+    NO_DATA: int = -9999
 
     @staticmethod
     def is_platform(file_path: Union[Path, str]) -> bool:
+
         file_path = Path(file_path) if isinstance(file_path, str) else file_path
         file_name = file_path.name
 
-        if "'MTD_TL.xml" in file_name:
+        if "MTD_" in file_name:
             return True
         return False
 
@@ -47,136 +60,150 @@ class Sentinel2:
 
         metadata: dict = extract_metadata(file_path, target_attributes)
 
+        logger.debug("Retrieved %s platform metadata parameter(s)", len(metadata))
+
         return metadata
 
     @classmethod
-    def _get_file_names(cls, file_path: Path) -> dict:
+    def _get_file_names(cls, file_path: Path) -> Dict[str, Path]:
 
-        attributes: list = ["FILE_NAME_BAND_{}"]
-        target_attributes: list = []
+        attributes: list = ["B{}"]
+        target_attributes: dict = {}
 
         for target in attributes:
             for band in cls.Bands.__members__.values():
-                target_attributes.append(target.format(band.value))
+                target_attributes[(target.format(str(band.value).zfill(2)))] = band.name
 
-        file_names: dict = extract_metadata(file_path, target_attributes)
+        files_in_target_dir: list = list(
+            Path(file_path.parent / "IMG_DATA").glob("*.jp2")
+        )
 
-        band_names: List[str] = [b.name for b in cls.Bands]
-        return {k: v for k, v in zip(band_names, file_names.values())}
+        if len(files_in_target_dir) == 0:
+            logger.error("No S2 band files found", stack_info=True)
+            raise FileNotFoundError("No S2 band files found")
+
+        file_names: Dict[str, Path] = {}
+        for file in files_in_target_dir:
+            for band_query, name in target_attributes.items():
+                if band_query in file.name:
+                    file_names[name] = file
+                    break
+
+        if len(file_names) != 9:
+            logger.error("Not enough S2 band files found", stack_info=True)
+            raise ValueError("Not enough S2 band files found")
+
+        return file_names
 
     @classmethod
     def get_data(cls, file_path: Union[Path, str]) -> SensorData:
 
         file_path = Path(file_path) if isinstance(file_path, str) else file_path
 
-        parameters = SensorData()
+        parameters: Dict[str, Any] = {
+            "cloud_threshold": cls.CLOUD_THRESHOLD,
+            "probability_weight": cls.PROBABILITY_WEIGHT,
+            "out_resolution": cls.OUT_RESOLUTION,
+        }
 
         calibration = cls._get_calibration_parameters(file_path)
         file_band_names = cls._get_file_names(file_path)
 
-        parameters.sensor = "S2_MSI"  # SupportedSensors.L08_OLI
-        parameters.sun_elevation = 90.0 - calibration["ZENITH_ANGLE"]
-        parameters.sun_azimuth = calibration["AZIMUTH_ANGLE"]
-        parameters.scene_id = file_path.name  # TODO redo this
+        parameters["file_band_names"] = file_band_names
+        parameters["sensor"] = "S2_MSI"
+        parameters["sun_azimuth"] = float(calibration.pop("AZIMUTH_ANGLE"))
+        parameters["sun_elevation"] = 90.0 - float(calibration.pop("ZENITH_ANGLE"))
+        parameters["calibration"] = calibration
+
+        parameters["scene_id"] = file_path.name.split("_MTL.txt")[0]  # TODO REDO this
+        parameters["erode_pixels"] = calculate_erosion_pixels(
+            parameters["out_resolution"]
+        )
+
+        parameters["band_data"] = {}
 
         for band in cls.Bands.__members__.values():
 
             band_number = band.value
             band_name = band.name
 
-            band_ds = None
-            band_array = None
+            band_path: Path = file_path.parent / file_band_names[band_name]
 
-            # band_ds = gdal.Open(file_band_names[band_name])
-            # band_array = band_ds.GetRasterBand(1).ReadAsArray().astype(np.unint16)
+            logger.debug(
+                "Processing band %s - %s from %s", band_number, band_name, band_path
+            )
 
             ##
-            # Upsample to 20m
+            # Downsample CIRRUS to 20m
             ##
-            if band in cls.RGB:
-                # GDAL WARP
-                # OPEN DS
-                ...
-
-            elif band == cls.Bands.CIRRUS:
-                # GDAL WARP
-                # OPEN DS
-                ...
-
+            if band == cls.Bands.CIRRUS:
+                resample_algorithm: str = "near"
+                band_ds = gdal.Warp(
+                    "",
+                    str(band_path),
+                    xRes=20,
+                    yRes=20,
+                    resampleAlg=resample_algorithm,
+                    srcNodata=0,
+                    dstNodata=0,
+                    format="VRT",
+                )
             else:
-                # CRETE DS
-                # OPEN DS
-                ...
+                band_ds = gdal.Open(str(band_path))
+
+            band_array: np.ndarray = np.array(
+                band_ds.GetRasterBand(1).ReadAsArray()
+            ).astype(np.uint16)
 
             ##
-            # Use RED band as projection base
+            # Upsample RGB and NIR to 20m
             ##
-            if band == cls.Bands.RED:
-                parameters.geo_transform = band_ds.GetGeoTransform()
-                parameters.projection_reference = band_ds.GetProjectionRef()
+            if band in cls.RESAMPLE_BANDS:
+                band_array = block_reduce(band_array, block_size=(2, 2), func=np.mean)
 
             ##
-            # NoData
+            # Use SWIR1 band as projection base
             ##
-            if not hasattr(parameters, "nodata_mask"):
-                parameters.nodata_mask = band_array == 0
+            if band == cls.Bands.SWIR1:
+                parameters["geo_transform"] = band_ds.GetGeoTransform()
+                parameters["projection_reference"] = band_ds.GetProjectionRef()
+
+            ##
+            # NoData Mask
+            ##
+            if parameters.get("nodata_mask") is None:
+                parameters["nodata_mask"] = band_array == 0
             else:
-                parameters.nodata_mask = (parameters == True) | (band_array == 0)
+                parameters["nodata_mask"] = (parameters["nodata_mask"] == True) | (
+                    band_array == 0
+                )
 
             ##
             # Saturation of visible bands (RGB)
             ##
-            if not hasattr(parameters, "vis_saturation"):
-                parameters.vis_saturation = np.zero(band_array.shape).astype(bool)
+            if parameters.get("vis_saturation") is None:
+                parameters["vis_saturation"] = np.zeros(band_array.shape).astype(bool)
 
             if band in cls.RGB:
-                parameters.vis_saturation = np.where(
-                    band_array == 65535, True, parameters.vis_saturation
+                parameters["vis_saturation"] = np.where(
+                    band_array == 65535, True, parameters["vis_saturation"]
                 )
-
-            ##
-            # Convert to TOA reflectance
-            ##
-            # processed_band_array: np.ndarray
-
-            # if band != cls.Bands.BT:
-            #     processed_band_array = band_array * parameters.calibration[band_name]
-            #     processed_band_array = (
-            #         1000
-            #         * processed_band_array
-            #         / np.sin(calibration["SUN_ELEVATION"] * np.pi / 180)
-            #     )
-
-            # elif band == cls.Bands.BT:
-
-            #     # convert to TOA
-            #     toa_array: np.ndarray = (
-            #         band_array * calibration[f"REFLECTANCE_MULT_BAND_{band_number}"]
-            #         + calibration[f"REFLECTANCE_ADD_BAND_{band_number}"]
-            #     )
-
-            #     # convert to kelvin
-            #     kelvin_array: np.ndarray = (
-            #         calibration[f"K2_CONSTANT_BAND_{band_number}"]
-            #     ) / np.log(
-            #         calibration[f"K1_CONSTANT_BAND_{band_number}"] / toa_array + 1
-            #     )
-
-            #     # convert to celsisus and scale
-            #     celsius_array: np.ndarray = 100 * (kelvin_array - 273.15)
-
-            #     processed_band_array = celsius_array
 
             ##
             # Assign NoData
             ##
+            processed_band_array: np.ndarray = np.where(
+                band_array > 10000, 10000, band_array
+            )
             processed_band_array = np.where(
                 band_array == 0, cls.NO_DATA, band_array
             ).astype(np.int16)
 
-            ##
-            # Assign band into object
-            ##
-            setattr(parameters, band_name, processed_band_array)
+            parameters["band_data"][band_name] = processed_band_array
 
-            return parameters
+            band_ds = None
+
+        parameters["x_size"] = parameters["band_data"]["RED"].shape[1]
+        parameters["y_size"] = parameters["band_data"]["RED"].shape[0]
+
+        return SensorData(**parameters)

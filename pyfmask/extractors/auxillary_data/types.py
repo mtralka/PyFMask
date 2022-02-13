@@ -6,6 +6,7 @@ from typing import NamedTuple
 class AuxTypes(Enum):
     GSWO: int = auto()
     DEM: int = auto()
+    MAPZEN: int = auto()
 
 
 class Coordinate(NamedTuple):

@@ -2,6 +2,9 @@ from typing import Dict
 from typing import Optional
 
 import numpy as np
+import logging.config
+
+logger = logging.getLogger(__name__)
 
 
 def detect_snow(ndsi: np.ndarray, band_data: Dict[str, np.ndarray]) -> np.ndarray:
@@ -15,5 +18,5 @@ def detect_snow(ndsi: np.ndarray, band_data: Dict[str, np.ndarray]) -> np.ndarra
     if bt is not None:
         snow = (snow == True) & (bt < 1000)
 
-    print("SNOW ", np.sum(snow))
+    logger.debug("Detected %s pixels of snow", np.sum(snow))
     return snow

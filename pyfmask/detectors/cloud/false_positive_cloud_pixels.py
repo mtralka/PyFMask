@@ -1,7 +1,7 @@
 from typing import Dict
 
 from typing import Optional
-
+import logging.config
 import numpy as np
 from pyfmask.utils.classes import DEMData
 from pyfmask.utils.classes import SensorData
@@ -10,6 +10,8 @@ from skimage import morphology
 from skimage.filters import threshold_otsu
 
 np.seterr(divide="ignore")
+
+logger = logging.getLogger(__name__)
 
 
 def detect_false_positive_cloud_pixels(
@@ -89,6 +91,10 @@ def detect_false_positive_cloud_pixels(
     potential_false_positives = (potential_false_positives == True) | (snow == True)
     potential_false_positives = (potential_false_positives == True) & (
         nodata_mask == False
+    )
+
+    logger.debug(
+        "%s potential false positive cloud pixels", np.sum(potential_false_positives)
     )
 
     return potential_false_positives

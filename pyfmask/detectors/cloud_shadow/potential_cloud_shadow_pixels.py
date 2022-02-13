@@ -2,9 +2,13 @@ from typing import Optional
 from typing import Tuple
 
 import numpy as np
+from pyfmask.detectors.cloud_shadow.match_cloud_shadows import shadow
 from pyfmask.utils.classes import DEMData
 from pyfmask.utils.classes import SensorData
 from skimage import morphology
+import logging.config
+
+logger = logging.getLogger(__name__)
 
 
 def detect_potential_cloud_shadow_pixels(
@@ -72,9 +76,11 @@ def detect_potential_cloud_shadow_pixels(
     # Remove potential shadows smaller than 3 pixels
     ##
     shadow_mask = morphology.remove_small_objects(
-        shadow_mask.astype(bool), 4, connectivity=2
+        shadow_mask.astype(bool), 3, connectivity=2
     )
     shadow_mask = np.where(nodata_mask, 255, shadow_mask)
+
+    logger.debug("Sum of cloud shadow mask %s", np.sum(shadow_mask))
 
     return shadow_mask
 

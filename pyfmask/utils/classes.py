@@ -68,8 +68,8 @@ class PotentialClouds:
     sum_clear_pixels: int
     cloud: np.ndarray
     clear_land: np.ndarray
+    temp_test_low: Union[int, float] = 0
+    temp_test_high: Union[int, float] = 0
     bt_normalized_dem: Optional[np.ndarray] = None
-    temp_test_low: Union[int, float] = None
-    temp_test_high: Union[int, float] = None
     over_land_probability: Optional[np.ndarray] = None
     over_water_probability: Optional[np.ndarray] = None

@@ -5,11 +5,14 @@ from typing import Optional
 from typing import cast
 import xml.etree.ElementTree as ET
 from pathlib import Path
+import logging.config
+
+logger = logging.getLogger(__name__)
 
 
 def _not_found_message(*args: str) -> None:
 
-    print(f" Did not find: {','.join(list(args))}")
+    logger.warn("Did not find %s", ",".join(list(args)))
 
     return None
 

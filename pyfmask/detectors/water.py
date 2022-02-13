@@ -1,6 +1,9 @@
 from typing import Optional, Tuple, Union
 from pyfmask.utils.classes import GSWOData
 import numpy as np
+import logging.config
+
+logger = logging.getLogger(__name__)
 
 
 def detect_water(
@@ -25,11 +28,11 @@ def detect_water(
     all_water: np.ndarray = np.where(nodata_mask, 0, water)
 
     if gswo is None or snow is None:
-        return water
+        return water, all_water
 
     # if not water present
     if np.sum(gswo) <= 0:
-        return water
+        return water, all_water
 
     # assume the water occurances are similar in each whole scene
     # global surface water occurance (GSWO)
@@ -47,9 +50,10 @@ def detect_water(
     if gswater_occur > 90:
         gswater_occur = 90
 
-    print(f"gswater_occur={gswater_occur}")
+    logger.debug("Gswater occur, %s", gswater_occur)
+
     if gswater_occur < 0:
-        return water
+        return water, all_water
 
     water_gs = gswo > gswater_occur
     all_water = np.where(water_gs == True, 1, all_water)
@@ -59,6 +63,6 @@ def detect_water(
     water = np.where(nodata_mask, 0, water)
     all_water = np.where(nodata_mask, 0, all_water)
 
-    print("WATER", np.sum(water))
+    logger.debug("Detected %s pixels of water", np.sum(water))
 
     return water, all_water

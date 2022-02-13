@@ -1,21 +1,23 @@
 from enum import Enum
+from importlib.metadata import metadata
+import logging.config
 from pathlib import Path
 from typing import Any
 from typing import Dict
-from typing import Final
 from typing import List
 from typing import Union
+from pyfmask.platforms.platform_base import PlatformBase
 
 import gdal
 import numpy as np
-
-# from pyfmask.utils.classes import SupportedSensors
 from pyfmask.extractors.metadata import extract_metadata
 from pyfmask.platforms.platform_utils import calculate_erosion_pixels
 from pyfmask.utils.classes import SensorData
 
+logger = logging.getLogger(__name__)
 
-class Landsat8:
+
+class Landsat8(PlatformBase):
     class Bands(Enum):
         BLUE = 2
         GREEN = 3
@@ -28,14 +30,14 @@ class Landsat8:
 
     RGB: tuple = (Bands.RED, Bands.GREEN, Bands.BLUE)
 
-    CLOUD_THRESHOLD: Final[float] = 17.5
-    PROBABILITY_WEIGHT: Final[float] = 0.3
-    OUT_RESOLUTION: Final[int] = 30
-    NO_DATA: Final[int] = -9999
+    CLOUD_THRESHOLD: float = 17.5
+    PROBABILITY_WEIGHT: float = 0.3  # for thin/cirrus clouds
+    OUT_RESOLUTION: int = 30
+    NO_DATA: int = -9999
 
     @staticmethod
     def is_platform(file_path: Union[Path, str]) -> bool:
-        print(file_path)
+
         file_path = Path(file_path) if isinstance(file_path, str) else file_path
         file_name = file_path.name
 
@@ -62,11 +64,11 @@ class Landsat8:
                     continue
                 target_attributes.append(target.format(band.value))
 
-        landsat_metadata: Dict[str, str] = extract_metadata(
-            file_path, target_attributes
-        )
+        metadata: Dict[str, str] = extract_metadata(file_path, target_attributes)
 
-        return {k: float(v) for k, v in landsat_metadata.items()}
+        logger.debug("Retrieved %s platform metadata parameter(s)", len(metadata))
+
+        return {k: float(v) for k, v in metadata.items()}
 
     @classmethod
     def _get_file_names(cls, file_path: Path) -> dict:
@@ -121,6 +123,10 @@ class Landsat8:
             band_ds = gdal.Open(str(band_path))
             band_array = band_ds.GetRasterBand(1).ReadAsArray().astype(np.uint16)
 
+            logger.debug(
+                "Processing band %s - %s from %s", band_number, band_name, band_path
+            )
+
             ##
             # Use RED band as projection base
             ##
@@ -129,7 +135,7 @@ class Landsat8:
                 parameters["projection_reference"] = band_ds.GetProjectionRef()
 
             ##
-            # NoData
+            # NoData Mask
             ##
             if parameters.get("nodata_mask") is None:
                 parameters["nodata_mask"] = band_array == 0
@@ -152,7 +158,6 @@ class Landsat8:
             ##
             # Convert to TOA reflectance
             ##
-            # processed_band_array: np.ndarray
 
             if band != cls.Bands.BT:
                 processed_band_array = (
@@ -191,6 +196,8 @@ class Landsat8:
             ).astype(np.int16)
 
             parameters["band_data"][band_name] = processed_band_array
+
+            band_ds = None
 
         parameters["x_size"] = parameters["band_data"]["RED"].shape[1]
         parameters["y_size"] = parameters["band_data"]["RED"].shape[0]

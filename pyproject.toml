@@ -1,8 +1,9 @@
 [tool.poetry]
 name = "pyfmask"
-version = "0.0.0"
+version = "0.1.0"
 description = ""
 authors = ["mtralka <mtralka@umd.edu>"]
+include = ["pyfmask/loggingConfig.json", "pyfmask/extractors/mapzen_wms.xml"]
 
 [tool.poetry.dependencies]
 python = "^3.8, <3.11"
@@ -24,3 +25,6 @@ build-backend = "poetry.core.masonry.api"
 
 [mypy]
 ignore_missing_imports = true
+
+[tool.poetry.scripts]
+pyfmask = 'pyfmask.cli:app'

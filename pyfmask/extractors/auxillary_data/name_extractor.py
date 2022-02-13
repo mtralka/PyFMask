@@ -11,11 +11,11 @@ def get_topo30_names(bbox: BoundingBox) -> list:
     # Processing North-South Lat data 90..-90
     idx_north = int((90 - north) / 50.0)
     idx_south = int((90 - south) / 50.0)
-    # print(idx_north, idx_south)
+
     fname_list_tmp = []
     for k in range(idx_north, idx_south + 1):
         idx_lat = 90 - 50 * k
-        # print(idx_lat)
+
         if idx_lat > 0:
             idx_str = f"n{idx_lat}"
         else:
@@ -44,7 +44,7 @@ def get_topo30_names(bbox: BoundingBox) -> list:
 
         for k in idx_list:
             idx_lon = int(-180 + step * k)
-            # print(idx_lon)
+
             if idx_lon <= 0:
                 idx_str = "w%03d" % (abs(idx_lon))
             else:
@@ -66,14 +66,14 @@ def get_gswo_names(bbox: BoundingBox) -> list:
     step = 10.0
     idx_north = int((90 - north) / step)
     idx_south = int((90 - south) / step)
-    # print(idx_north, idx_south)
+
     fname_list_tmp = []
     for k in range(idx_north, idx_south + 1):
         idx_lat = int(90 - step * k)
         # only 80..-80 available
         if (idx_lat == 90) | (idx_lat == -80):
             continue
-        # print(idx_lat)
+
         if idx_lat >= 0:
             idx_str = f"{idx_lat}N"
         else:
@@ -100,14 +100,12 @@ def get_gswo_names(bbox: BoundingBox) -> list:
 
         for k in idx_list:
             idx_lon = int(-180 + step * k)
-            # print(idx_lon)
+
             if idx_lon < 0:
                 idx_str = f"{abs(idx_lon)}W"
             else:
                 idx_str = f"{idx_lon}E"
                 fname = f"occurrence_{idx_str}_{f_north}"
                 fname_list.append(fname)
-
-    # print(fname_list_tmp)
 
     return fname_list

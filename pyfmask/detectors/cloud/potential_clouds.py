@@ -1,3 +1,4 @@
+import logging.config
 from typing import Dict
 from typing import Optional
 from typing import Tuple
@@ -9,6 +10,9 @@ from pyfmask.utils.classes import DEMData
 from pyfmask.utils.classes import PotentialCloudPixels
 from pyfmask.utils.classes import PotentialClouds
 import statsmodels.api as sm
+
+
+logger = logging.getLogger(__name__)
 
 
 def detect_potential_clouds(
@@ -189,6 +193,8 @@ def detect_potential_clouds(
     potential_clouds = np.where(id_final_cld, 1, potential_clouds)
     potential_clouds = np.where(nodata_mask == True, 0, potential_clouds)
 
+    logger.debug("%s potential clouds", np.sum(potential_clouds))
+
     return PotentialClouds(
         sum_clear_pixels=sum_clear_pixels,
         cloud=potential_clouds,
@@ -256,12 +262,12 @@ def normalize_bt(bt, dem, idused, low_percent, high_percent):
         X = sm.add_constant(dem_sampled)
         Y = bt_sampled
         est = sm.OLS(Y, X).fit()
-        # print(est.summary())
-        print("DEBUG", est.params, len(est.params))
+
+        logger.debug("%s regression paramters - %s", len(est.params), est.params)
+
         if len(est.params) == 1:
             return norm_bt
         rate_lapse = est.params[1]
-        print("test")
         rate_lapse_pvalue = est.pvalues[1]
 
         # only perform normalization when
@@ -331,6 +337,9 @@ def land_temperature_probability(
 
     temp_test_low: Union[int, float] = low_percentile - temp_buffer
     temp_test_high: Union[int, float] = high_percentile + temp_buffer
+
+    logger.debug("Cloud temp test low: %s ", temp_test_low)
+    logger.debug("Cloud temp test high: %s ", temp_test_high)
 
     temp_limit: Union[int, float] = temp_test_high - temp_test_low
 
@@ -470,7 +479,6 @@ def spectral_variance_probability(
 #     Y = bt_sampled
 #     est = sm.OLS(Y, X).fit()
 
-#     # print(est.summary())
 
 #     rate_lapse = est.params[1]
 #     rate_lapse_pvalue = est.pvalues[1]

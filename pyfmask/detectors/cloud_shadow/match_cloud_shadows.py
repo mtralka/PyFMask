@@ -1,3 +1,4 @@
+import logging.config
 import math
 from typing import Optional
 from typing import Union
@@ -8,10 +9,13 @@ from pyfmask.utils.classes import SensorData
 from skimage.measure import label
 from skimage.measure import regionprops
 
+
 ####
 # TODO
 # - optimize matching
 ####
+
+logger = logging.getLogger(__name__)
 
 
 def shadow(H, sun_elev, sun_azim):  # in degrees
@@ -71,7 +75,8 @@ def match_cloud_shadows(
     # Don't matched shadows if there are too many clouds
     ##
     if (sum_clear_pixels <= cloud_pixels_limit) | (revised_cloud_percent >= 0.90):
-        print("Skip cloud shadow detection because high cloud cover")
+
+        logger.debug("Skipping cloud shadow detection due to high cloud cover")
 
         matched_cloud_shadow_layer = np.where(
             shadow_potential == False, 1, matched_cloud_shadow_layer
@@ -102,7 +107,7 @@ def match_cloud_shadows(
     if np.size(cloud_labels_list) == 0:
         return matched_cloud_shadow_layer
 
-    print(f"number of labels {np.max(cloud_labels_list)}")
+    logger.debug("%s cloud labels", np.max(cloud_labels_list))
 
     ##
     # Label shadows
@@ -446,4 +451,7 @@ def match_cloud_shadows(
                     | shadow_template[r0_shift:r1_shift, c0_shift:c1_shift]
                 )
 
+    logger.debug(
+        "Sum of matched cloud shadow layer %s", np.sum(matched_cloud_shadow_layer)
+    )
     return matched_cloud_shadow_layer

@@ -2,6 +2,9 @@ from typing import Dict
 
 import numpy as np
 from scipy.ndimage import uniform_filter
+import logging.config
+
+logger = logging.getLogger(__name__)
 
 
 def detect_absolute_snow(
@@ -50,4 +53,5 @@ def detect_absolute_snow(
         (scsi < 9) & (detected_snow == True) & (vis_saturation == False)
     )
 
+    logger.debug("Detected %s pixels of absolute snow", np.sum(absolute_snow))
     return absolute_snow
