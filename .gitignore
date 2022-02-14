@@ -1,5 +1,8 @@
 test_data/
 test.ipynb
+*.log
+pyfmask/gdalwmscache/**/*
+gdalwmscache/*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

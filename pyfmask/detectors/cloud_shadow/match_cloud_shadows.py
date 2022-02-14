@@ -4,8 +4,8 @@ from typing import Optional
 from typing import Union
 
 import numpy as np
-from pyfmask.utils.classes import DEMData
-from pyfmask.utils.classes import SensorData
+from pyfmask.classes import DEMData
+from pyfmask.classes import SensorData
 from skimage.measure import label
 from skimage.measure import regionprops
 

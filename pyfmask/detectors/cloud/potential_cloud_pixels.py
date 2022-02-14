@@ -3,8 +3,8 @@ from typing import Optional
 from typing import Union
 
 import numpy as np
-from pyfmask.utils.classes import DEMData
-from pyfmask.utils.classes import PotentialCloudPixels
+from pyfmask.classes import DEMData
+from pyfmask.classes import PotentialCloudPixels
 
 import logging.config
 

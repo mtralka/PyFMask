@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Dict
 from typing import Union
 
-from pyfmask.utils.classes import SensorData
+from pyfmask.classes import SensorData
 
 
 class PlatformBase:
@@ -17,6 +17,10 @@ class PlatformBase:
     PROBABILITY_WEIGHT: float  # for thin/cirrus clouds
     OUT_RESOLUTION: int
     NO_DATA: int
+
+    @staticmethod
+    def calculate_erosion_pixels(out_resolution: int) -> int:
+        return round(90.0 / out_resolution)
 
     @staticmethod
     def is_platform(file_path: Union[Path, str]) -> bool:

@@ -1,25 +1,10 @@
 from dataclasses import dataclass
-from enum import Enum
-from pathlib import Path
 from typing import Any, List
 from typing import Dict
 from typing import Optional
 from typing import Union
 
 import numpy as np
-
-
-# from pyfmask.platforms.landsat8 import Landsat8
-# from pyfmask.platforms.sentinel2 import Sentinel2
-
-
-# class SupportedSensors(Enum):
-#     L08_OLI = Landsat8
-#     S2_MSI = Sentinel2
-
-# class SupportedSensors(Enum):
-# #     L08_OLI = Landsat8
-# #     S2_MSI = Sentinel2
 
 
 @dataclass

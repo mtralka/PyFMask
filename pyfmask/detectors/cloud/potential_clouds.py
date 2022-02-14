@@ -6,9 +6,9 @@ from typing import Union
 from typing import cast
 
 import numpy as np
-from pyfmask.utils.classes import DEMData
-from pyfmask.utils.classes import PotentialCloudPixels
-from pyfmask.utils.classes import PotentialClouds
+from pyfmask.classes import DEMData
+from pyfmask.classes import PotentialCloudPixels
+from pyfmask.classes import PotentialClouds
 import statsmodels.api as sm
 
 
@@ -40,7 +40,6 @@ def detect_potential_clouds(
 
     potential_clouds = np.zeros(nir.shape, dtype=np.uint8)
 
-    # idused: Optional[np.ndarray] = None
     idused: np.ndarray = np.zeros(nir.shape)
 
     bt_normalized_dem: Optional[np.ndarray] = None

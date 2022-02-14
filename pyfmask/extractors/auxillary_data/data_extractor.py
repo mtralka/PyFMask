@@ -14,8 +14,8 @@ import osr
 from pyfmask.extractors.auxillary_data.dataset_creator import create_local_aux_dataset
 from pyfmask.extractors.auxillary_data.dataset_creator import create_mapzen_dataset
 from pyfmask.extractors.auxillary_data.types import AuxTypes
-from pyfmask.utils.classes import DEMData
-from pyfmask.utils.classes import GSWOData
+from pyfmask.classes import DEMData
+from pyfmask.classes import GSWOData
 
 
 logger = logging.getLogger(__name__)

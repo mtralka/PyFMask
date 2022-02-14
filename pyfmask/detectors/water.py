@@ -1,5 +1,5 @@
-from typing import Optional, Tuple, Union
-from pyfmask.utils.classes import GSWOData
+from typing import Optional, Tuple
+from pyfmask.classes import GSWOData
 import numpy as np
 import logging.config
 

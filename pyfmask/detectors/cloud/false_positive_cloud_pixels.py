@@ -1,13 +1,13 @@
-from typing import Dict
-
-from typing import Optional
 import logging.config
-import numpy as np
-from pyfmask.utils.classes import DEMData
-from pyfmask.utils.classes import SensorData
+from typing import Dict
+from typing import Optional
 
+import numpy as np
+from pyfmask.classes import DEMData
+from pyfmask.classes import SensorData
 from skimage import morphology
 from skimage.filters import threshold_otsu
+
 
 np.seterr(divide="ignore")
 

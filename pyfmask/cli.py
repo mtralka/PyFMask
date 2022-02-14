@@ -29,32 +29,39 @@ def app():
         default=0,
     )
     parser.add_argument(
-        "--save-cloud-prob",
+        "--save_cloud_prob",
         help="Boolean whether to output cloud probability map",
         type=bool,
         default=False,
+    ),
+    parser.add_argument(
+        "--use_mapzen",
+        help="Boolean to use Mapzen",
+        type=bool,
+        default=True,
     )
     parser.add_argument(
-        "--dem-path", help="Path to DEM where folder GTOPO30ZIP located"
+        "--dem_path", help="Path to DEM where folder GTOPO30ZIP located"
     )
     parser.add_argument(
-        "--gswo-path", help="Path to GWSO where folder GSWO150ZIP located"
+        "--gswo_path", help="Path to GWSO where folder GSWO150ZIP located"
     )
     args = parser.parse_args()
 
     fmask_control = FMask(
-        infile=args.get("infile"),
-        out_dir=args.get("out_dir"),
-        out_name=args.get("out_name"),
-        dem_path=args.get("dem-path"),
-        gswo_path=args.get("gswo-path"),
-        dilated_shadow_px=args.get("shadow"),
-        dilated_cloud_px=args.get("cloud"),
-        dilated_snow_px=args.get("snow"),
-        save_cloud_prob=args.get("save-cloud-prob"),
+        infile=args.infile,
+        out_dir=args.out_dir,
+        out_name=args.out_name,
+        dem_path=args.dem_path,
+        gswo_path=args.gswo_path,
+        dilated_shadow_px=args.shadow,
+        dilated_cloud_px=args.cloud,
+        dilated_snow_px=args.snow,
+        save_cloud_prob=args.save_cloud_prob,
         auto_save=True,
         auto_run=True,
         delete_temp_dir=True,
+        use_mapzen=args.use_mapzen,
     )
 
     return 0

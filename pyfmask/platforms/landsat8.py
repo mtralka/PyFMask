@@ -11,8 +11,7 @@ from pyfmask.platforms.platform_base import PlatformBase
 import gdal
 import numpy as np
 from pyfmask.extractors.metadata import extract_metadata
-from pyfmask.platforms.platform_utils import calculate_erosion_pixels
-from pyfmask.utils.classes import SensorData
+from pyfmask.classes import SensorData
 
 logger = logging.getLogger(__name__)
 
@@ -107,7 +106,7 @@ class Landsat8(PlatformBase):
         parameters["sun_elevation"] = float(calibration.pop("SUN_ELEVATION"))
         parameters["calibration"] = calibration
         parameters["scene_id"] = file_path.name.split("_MTL.txt")[0]  # TODO REDO this
-        parameters["erode_pixels"] = calculate_erosion_pixels(
+        parameters["erode_pixels"] = cls.calculate_erosion_pixels(
             parameters["out_resolution"]
         )
 

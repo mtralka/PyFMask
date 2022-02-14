@@ -34,12 +34,12 @@ from pyfmask.raster_utilities.io import write_array_to_ds
 from pyfmask.raster_utilities.morphology import dilate_array
 from pyfmask.raster_utilities.morphology import enhance_line
 from pyfmask.raster_utilities.morphology import erode_commissons
-from pyfmask.utils.classes import DEMData
-from pyfmask.utils.classes import GSWOData
-from pyfmask.utils.classes import PotentialCloudPixels
-from pyfmask.utils.classes import PotentialClouds
-from pyfmask.utils.classes import SensorData
-from pyfmask.utils.utils import valdiate_path
+from pyfmask.classes import DEMData
+from pyfmask.classes import GSWOData
+from pyfmask.classes import PotentialCloudPixels
+from pyfmask.classes import PotentialClouds
+from pyfmask.classes import SensorData
+from pyfmask.utils import valdiate_path
 
 with resources.path("pyfmask", "loggingConfig.json") as p:
     logging_config_path: str = str(p)
@@ -66,7 +66,7 @@ class FMask:
         use_mapzen: bool = True,
         auto_run: bool = False,
         auto_save: bool = True,
-        delete_temp_dir: bool = False,
+        delete_temp_dir: bool = True,
         save_cloud_prob: bool = True,
     ):
         self.infile: Path = valdiate_path(infile, check_exists=True, check_is_file=True)

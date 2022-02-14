@@ -3,8 +3,8 @@ from typing import Tuple
 
 import numpy as np
 from pyfmask.detectors.cloud_shadow.match_cloud_shadows import shadow
-from pyfmask.utils.classes import DEMData
-from pyfmask.utils.classes import SensorData
+from pyfmask.classes import DEMData
+from pyfmask.classes import SensorData
 from skimage import morphology
 import logging.config
 

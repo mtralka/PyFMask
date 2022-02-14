@@ -10,8 +10,7 @@ import gdal
 import numpy as np
 from pyfmask.extractors.metadata import extract_metadata
 from pyfmask.platforms.platform_base import PlatformBase
-from pyfmask.platforms.platform_utils import calculate_erosion_pixels
-from pyfmask.utils.classes import SensorData
+from pyfmask.classes import SensorData
 
 
 logger = logging.getLogger(__name__)
@@ -35,7 +34,6 @@ class Sentinel2(PlatformBase):
         Bands.GREEN,
         Bands.BLUE,
         Bands.NIR,
-        Bands.CIRRUS,
     )
 
     CLOUD_THRESHOLD: float = 20
@@ -116,7 +114,7 @@ class Sentinel2(PlatformBase):
         parameters["calibration"] = calibration
 
         parameters["scene_id"] = file_path.name.split("_MTL.txt")[0]  # TODO REDO this
-        parameters["erode_pixels"] = calculate_erosion_pixels(
+        parameters["erode_pixels"] = cls.calculate_erosion_pixels(
             parameters["out_resolution"]
         )
 
