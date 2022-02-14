@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Dict
 from typing import Union
 
-from pyfmask.classes import SensorData
+from pyfmask.classes import PlatformData
 
 
 class PlatformBase:
@@ -38,6 +38,6 @@ class PlatformBase:
         raise NotImplementedError
 
     @classmethod
-    def get_data(cls, file_path: Union[Path, str]) -> SensorData:
-        """Returns `SensorData` type of platform info from `file_path`"""
+    def get_data(cls, file_path: Union[Path, str]) -> PlatformData:
+        """Returns `PlatformData` type of platform info from `file_path`"""
         raise NotImplementedError

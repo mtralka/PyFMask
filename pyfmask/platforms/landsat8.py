@@ -11,7 +11,7 @@ from pyfmask.platforms.platform_base import PlatformBase
 import gdal
 import numpy as np
 from pyfmask.extractors.metadata import extract_metadata
-from pyfmask.classes import SensorData
+from pyfmask.classes import PlatformData
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +40,9 @@ class Landsat8(PlatformBase):
         file_path = Path(file_path) if isinstance(file_path, str) else file_path
         file_name = file_path.name
 
-        if ("LC08" in file_name) & ("_MTL.txt" in file_name):
+        if ("LC08" in file_name) & (
+            ("_MTL.txt" in file_name) or ("_MTL.xml" in file_name)
+        ):
             return True
         return False
 
@@ -79,6 +81,7 @@ class Landsat8(PlatformBase):
             for band in cls.Bands.__members__.values():
                 target_attributes.append(target.format(band.value))
 
+        target_attributes.append("LANDSAT_PRODUCT_ID")
         file_names: dict = extract_metadata(file_path, target_attributes)
 
         band_names: List[str] = [b.name for b in cls.Bands]
@@ -86,7 +89,7 @@ class Landsat8(PlatformBase):
         return {k: v.strip('"') for k, v in zip(band_names, file_names.values())}
 
     @classmethod
-    def get_data(cls, file_path: Union[Path, str]) -> SensorData:
+    def get_data(cls, file_path: Union[Path, str]) -> PlatformData:
 
         file_path = Path(file_path) if isinstance(file_path, str) else file_path
 
@@ -100,12 +103,14 @@ class Landsat8(PlatformBase):
 
         file_band_names = cls._get_file_names(file_path)
 
+        parameters["scene_id"] = file_band_names.pop(
+            "LANDSAT_PRODUCT_ID"
+        )  # file_path.parent.name
         parameters["file_band_names"] = file_band_names
         parameters["sensor"] = "L08_OLI"  # SupportedSensors.L08_OLI
         parameters["sun_azimuth"] = float(calibration.pop("SUN_AZIMUTH"))
         parameters["sun_elevation"] = float(calibration.pop("SUN_ELEVATION"))
         parameters["calibration"] = calibration
-        parameters["scene_id"] = file_path.name.split("_MTL.txt")[0]  # TODO REDO this
         parameters["erode_pixels"] = cls.calculate_erosion_pixels(
             parameters["out_resolution"]
         )
@@ -201,4 +206,4 @@ class Landsat8(PlatformBase):
         parameters["x_size"] = parameters["band_data"]["RED"].shape[1]
         parameters["y_size"] = parameters["band_data"]["RED"].shape[0]
 
-        return SensorData(**parameters)
+        return PlatformData(**parameters)

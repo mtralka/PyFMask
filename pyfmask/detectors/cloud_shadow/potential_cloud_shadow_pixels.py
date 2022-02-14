@@ -4,7 +4,7 @@ from typing import Tuple
 import numpy as np
 from pyfmask.detectors.cloud_shadow.match_cloud_shadows import shadow
 from pyfmask.classes import DEMData
-from pyfmask.classes import SensorData
+from pyfmask.classes import PlatformData
 from skimage import morphology
 import logging.config
 
@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 def detect_potential_cloud_shadow_pixels(
-    platform_data: SensorData,
+    platform_data: PlatformData,
     dem_data: Optional[DEMData],
     clear_land: np.ndarray,
     low_percent: float = 0.175,

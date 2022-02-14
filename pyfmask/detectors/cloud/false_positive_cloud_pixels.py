@@ -4,7 +4,7 @@ from typing import Optional
 
 import numpy as np
 from pyfmask.classes import DEMData
-from pyfmask.classes import SensorData
+from pyfmask.classes import PlatformData
 from skimage import morphology
 from skimage.filters import threshold_otsu
 
@@ -18,7 +18,7 @@ def detect_false_positive_cloud_pixels(
     band_data: Dict[str, np.ndarray],
     ndbi: np.ndarray,
     ndvi: np.ndarray,
-    platform_data: SensorData,
+    platform_data: PlatformData,
     snow: np.ndarray,
     water: np.ndarray,
     cloud: np.ndarray,

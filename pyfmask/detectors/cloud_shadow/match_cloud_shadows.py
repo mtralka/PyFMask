@@ -5,7 +5,7 @@ from typing import Union
 
 import numpy as np
 from pyfmask.classes import DEMData
-from pyfmask.classes import SensorData
+from pyfmask.classes import PlatformData
 from skimage.measure import label
 from skimage.measure import regionprops
 
@@ -32,7 +32,7 @@ def match_cloud_shadows(
     sum_clear_pixels: int,
     all_water: np.ndarray,
     potential_cloud_shadow_pixels: np.ndarray,
-    platform_data: SensorData,
+    platform_data: PlatformData,
     dem_data: Optional[DEMData],
     temp_test_low: Union[int, float],
     temp_test_high: Union[int, float],

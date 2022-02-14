@@ -96,7 +96,7 @@ def create_local_aux_dataset(
         aux_dataset_list.append(aux_ds)
 
     if len(aux_dataset_list) <= 0:
-        logger.warn("No Aux DS files found")
+        logger.warn("No Aux DS files found for %s", aux_type.name)
         return None
 
     outfile_path: Path = temp_dir / f"_{scene_id}{aux_type.name}.tif"

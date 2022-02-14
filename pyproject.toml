@@ -1,13 +1,12 @@
 [tool.poetry]
 name = "pyfmask"
-version = "0.1.0"
-description = "The definitive Python implementation of FMask 4.4 for Landsat 8 and Sentinel 2 "
+version = "1.0.0"
+description = "The definitive Python implementation of FMask 4.3 for Landsat 8 and Sentinel 2 "
 authors = ["mtralka <mtralka@umd.edu>"]
 keywords = ["remote sensing", "cloud detection", "fmask"]
 include = ["pyfmask/loggingConfig.json", "pyfmask/extractors/mapzen_wms.xml"]
 
 classifiers = [
-    "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
     "Intended Audience :: Education",
     "Intended Audience :: Developers",

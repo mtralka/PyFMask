@@ -10,7 +10,7 @@ import gdal
 import numpy as np
 from pyfmask.extractors.metadata import extract_metadata
 from pyfmask.platforms.platform_base import PlatformBase
-from pyfmask.classes import SensorData
+from pyfmask.classes import PlatformData
 
 
 logger = logging.getLogger(__name__)
@@ -94,7 +94,7 @@ class Sentinel2(PlatformBase):
         return file_names
 
     @classmethod
-    def get_data(cls, file_path: Union[Path, str]) -> SensorData:
+    def get_data(cls, file_path: Union[Path, str]) -> PlatformData:
 
         file_path = Path(file_path) if isinstance(file_path, str) else file_path
 
@@ -113,7 +113,7 @@ class Sentinel2(PlatformBase):
         parameters["sun_elevation"] = 90.0 - float(calibration.pop("ZENITH_ANGLE"))
         parameters["calibration"] = calibration
 
-        parameters["scene_id"] = file_path.name.split("_MTL.txt")[0]  # TODO REDO this
+        parameters["scene_id"] = file_path.parent.name  # uses name of parent folder
         parameters["erode_pixels"] = cls.calculate_erosion_pixels(
             parameters["out_resolution"]
         )
@@ -204,4 +204,4 @@ class Sentinel2(PlatformBase):
         parameters["x_size"] = parameters["band_data"]["RED"].shape[1]
         parameters["y_size"] = parameters["band_data"]["RED"].shape[0]
 
-        return SensorData(**parameters)
+        return PlatformData(**parameters)

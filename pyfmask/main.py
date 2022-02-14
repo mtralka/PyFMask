@@ -3,16 +3,21 @@ import json
 import logging.config
 from pathlib import Path
 from shutil import rmtree
+import time
 from typing import Any
 from typing import Dict
 from typing import Optional
 from typing import Union
 from typing import cast
-import time
 
 import gdalconst
 import numpy as np
 
+from pyfmask.classes import DEMData
+from pyfmask.classes import GSWOData
+from pyfmask.classes import PlatformData
+from pyfmask.classes import PotentialCloudPixels
+from pyfmask.classes import PotentialClouds
 from pyfmask.detectors import detect_absolute_snow
 from pyfmask.detectors import detect_snow
 from pyfmask.detectors import detect_water
@@ -34,62 +39,178 @@ from pyfmask.raster_utilities.io import write_array_to_ds
 from pyfmask.raster_utilities.morphology import dilate_array
 from pyfmask.raster_utilities.morphology import enhance_line
 from pyfmask.raster_utilities.morphology import erode_commissons
-from pyfmask.classes import DEMData
-from pyfmask.classes import GSWOData
-from pyfmask.classes import PotentialCloudPixels
-from pyfmask.classes import PotentialClouds
-from pyfmask.classes import SensorData
-from pyfmask.utils import valdiate_path
+from pyfmask.utils import validate_path
+
 
 with resources.path("pyfmask", "loggingConfig.json") as p:
     logging_config_path: str = str(p)
 
 with open(logging_config_path, "rt") as file:
-    logging.config.dictConfig(json.load(file))
+    logging_config: dict = json.load(file)
 
+logging.config.dictConfig(logging_config)
 logger = logging.getLogger(__name__)
 
 
 class FMask:
+    """Control object for FMask operations
+
+    After executing the `run()` method on instance object, generates
+    fmask `results` array with the following default values:
+
+    Water - 1
+    Cloud Shadow - 2
+    Snow - 3
+    Cloud - 4
+    No Data - 255
+
+    These values can be overridden, see attributes below.
+
+    Attributes
+    ----------
+
+    `infile` : Union[Path, str]
+        Path to Sentinel-2 or Landast-8 file EX. {*._MTL.txt, MTD_*.xml}
+    `out_dir`: Union[Path, str]
+        Directory for program outputs EX. temporary folder, fmask results, probability masks
+    `out_name`: Optional[str]
+        Override default naming method `{self.platform_data.scene_id}_fmask`, default None
+    `gswo_path`: Optional[Union[Path, str]]
+        Optional path to local GSWO directory, default None
+    `dem_path`: Optional[Union[Path, str]]
+        Optional path to local DEM directory, default None
+        Must be given for DEM operations if `use_mapzen` is False
+    `dilated_cloud_px`: int
+        Number of cloud pixels to dilate, default 3
+    `dilated_shadow_px`: int
+        Number of cloud shadow pixels to dilate, default 3
+    `dilated_snow_px`: int
+        Number of snow pixels to dilate, default to 0
+    `dem_nodata`: Union[float, int]
+        Override for standard DEM nodata values, default -9999
+    `gswo_nodata`: Union[float, int]
+        Override for standard GSWO nodata values, default 255
+    `water_value`: int
+        Value for water in fmask result array, default 1
+    `snow_value`: int
+        Value for snow in fmask result array, default 3
+    `cloud_shadow_value`: int
+        Value for cloud shadow in fmask result array, default 2
+    `cloud_value`: int
+        Value for cloud in fmask result array, default 4
+    `use_mapzen`: bool
+        Bool to use Mapzen WMS DEM mapping, default True
+        If false, `dem_path` must be given to use DEM operations
+    `auto_run`: bool
+        Bool to automatically run `cls.run()` method on object init, default False
+    `auto_save`: bool
+        Bool to automatically save fmask `results` array after `run()` completion, default True
+    `delete_temp_dir`: bool
+        Bool to automatically delete temporary directory - `temp_dir` - after `run()`, default True
+    `save_cloud_prob`: bool
+        Bool to save cloud probability array with fmask results, default True
+    `log_in_temp_dir`: bool
+        Bool to update log file locations to `temp_dir` after `temp_dir` creation, default True
+        Will result in logfile loss for all log statements before `temp_dir` creation
+
+    Properties
+    -------
+    `outfile_path` : str
+        Full outfile path for fmask results - `out_dir` / `out_name`
+        Uses `self.platform_data.scene_id` if `out_name` is None
+
+    `temp_dirname` : str
+        Full path to temporary directory - `self.platform_data.scene_id` + '_temp'
+
+    Methods
+    -------
+    `run()`
+        Run fmask routine. Generates np.ndarray array `self.results` with value code as described with attributes `water_value`, `snow_value`, `cloud_shadow_value`, `cloud_value`
+    `save_results()`
+        Save `self.results` to `outfile_path` property
+    `save_array_to_file(array: np.ndarray, file_path: str)`
+        Save `array` to `file_path` using `self.platform_info` raster parameters
+
+
+    Example
+    -------
+    >>> from pyfmask import FMask
+
+    # required arguments
+    >>> infile: str = "path/to/landsat/or/sentinel/file" # {*._MTL.txt, MTD_*.xml}
+    >>> out_dir: str = "path/to/desired/out/dir"
+
+    ## Example 1
+    # No local GSWO or DEM. Using Mapzen WMS DEM. Auto-generated name based on scene id
+    ##
+    >>> controller = FMask(infile=infile, out_dir=out_dir)
+    >>> controller.run() # manually run unless arg `auto_run` is True
+    >>> controller.save_results() # manually save unless arg `auto_save` is True
+
+    ## Example 2
+    # Using local GSWO and DEM (no mapzen)
+    ##
+    >>> dem_path: str = "path/to/local/dem/GTOPO30ZIP"
+    >>> gswo_path: str = "path/to/local/gswo/GSWO150ZIP"
+    >>> controller = FMask(infile=infile, out_dir=out_dir, gswo_path=gswo_path,
+        dem_path=dem_path, use_mapzen=False, auto_run=True, auto_save=True)
+
+
+    ## Example 3
+    # Override default name & don't auto-delete `temp_dir`
+    ##
+    >>> out_file_name: str = "example_file.tif"
+    >>> controller = FMask(infile=infile, out_dir=out_dir, delete_temp_dir=False,
+        out_name=out_file_name, auto_run=True, auto_save=True)
+    """
+
     def __init__(
         self,
         infile: Union[Path, str],
         out_dir: Union[Path, str],
-        out_name: str,
-        gswo_path: Union[Path, str],
+        out_name: Optional[str] = None,
+        gswo_path: Optional[Union[Path, str]] = None,
         dem_path: Optional[Union[Path, str]] = None,
         dilated_cloud_px: int = 3,
         dilated_shadow_px: int = 3,
         dilated_snow_px: int = 0,
         dem_nodata: Union[float, int] = -9999,
         gswo_nodata: Union[float, int] = 255,
+        water_value: int = 1,
+        snow_value: int = 3,
+        cloud_shadow_value: int = 2,
+        cloud_value: int = 4,
         use_mapzen: bool = True,
         auto_run: bool = False,
         auto_save: bool = True,
         delete_temp_dir: bool = True,
         save_cloud_prob: bool = True,
+        log_in_temp_dir: bool = True,
     ):
-        self.infile: Path = valdiate_path(infile, check_exists=True, check_is_file=True)
+        self.infile: Path = validate_path(infile, check_exists=True, check_is_file=True)
 
-        self.out_dir: Path = valdiate_path(out_dir, check_is_dir=True)
-        self.out_name: str = out_name
+        self.out_dir: Path = validate_path(out_dir, check_is_dir=True)
+        self.out_name: Optional[str] = out_name
 
-        self.gswo_path: Path = valdiate_path(
-            gswo_path, check_exists=True, check_is_dir=True
-        )
+        self.gswo_path: Optional[Path] = Path(gswo_path) if gswo_path else None
+        if gswo_path is not None:
+            self.gswo_path = validate_path(
+                gswo_path, check_exists=True, check_is_dir=True
+            )
 
-        self.dem_path: Optional[Path] = None
-        if dem_path:
-            self.dem_path = valdiate_path(
+        self.dem_path: Optional[Path] = Path(dem_path) if dem_path else None
+        if dem_path is not None:
+            self.dem_path = validate_path(
                 dem_path, check_exists=True, check_is_dir=True
             )
 
         if not use_mapzen and not dem_path:
-            logger.error(
-                "Must select `use_mapzen` or provide a local `dem_path`",
-                stack_info=True,
+            logger.warn(
+                "`use_mapzen` is false and no `dem_path` provided, will not use DEM data"
             )
-            raise ValueError("Must select `use_mapzen` or provide a local `dem_path`")
+
+        if not self.gswo_path:
+            logger.warn("`gswo_path` not given, will not use GSWO data")
 
         self.use_mapzen: bool = use_mapzen
 
@@ -105,11 +226,16 @@ class FMask:
         self.dem_nodata: Union[float, int] = dem_nodata
         self.gswo_nodata: Union[float, int] = gswo_nodata
 
-        self.temp_dir: Path
+        self.log_in_temp_dir: bool = log_in_temp_dir
 
-        self.platform_data: SensorData
-        self.dem_data: Optional[DEMData]
-        self.gswo_data: Optional[GSWOData]
+        self.water_value: int = water_value
+        self.snow_value: int = snow_value
+        self.cloud_shadow_value: int = cloud_shadow_value
+        self.cloud_value: int = cloud_value
+
+        self.platform_data: PlatformData
+        self.dem_data: Optional[DEMData] = None
+        self.gswo_data: Optional[GSWOData] = None
 
         self.ndvi: np.ndarray
         self.ndsi: np.ndarray
@@ -133,9 +259,21 @@ class FMask:
 
     @property
     def outfile_path(self) -> str:
-        return str(self.out_dir / self.out_name)
+        """Outfile name"""
+        out_name: str = (
+            self.out_name
+            if self.out_name
+            else self.platform_data.scene_id + "_fmask.tif"
+        )
+        return str(self.out_dir / out_name)
+
+    @property
+    def temp_dirname(self) -> str:
+        """Temporary file directory name"""
+        return str(self.outfile_path) + "_temp"
 
     def run(self) -> None:
+        """Run fmask routine"""
 
         logger.info("Starting FMask")
 
@@ -149,12 +287,27 @@ class FMask:
         ##
         # Create temporary directory for intermediate files
         ##
-        self.temp_dir = self._create_temp_directory()
+        self._create_temp_directory()
 
         ##
-        # Extract DEM data
+        # Update logging file directory
         ##
-        self._extract_dem_data()
+        if self.log_in_temp_dir:
+            logging_config["handlers"]["debug_file_handler"]["filename"] = (
+                self.temp_dir
+                / logging_config["handlers"]["debug_file_handler"]["filename"]
+            )
+            logging_config["handlers"]["info_file_handler"]["filename"] = (
+                self.temp_dir
+                / logging_config["handlers"]["info_file_handler"]["filename"]
+            )
+            logging.config.dictConfig(logging_config)
+            logger.debug("Log location changed to %s", self.temp_dir)
+
+        ##
+        # Extract Aux data
+        ##
+        self._extract_aux_data()
 
         ##
         # Create requisite spectral composites
@@ -261,7 +414,7 @@ class FMask:
 
         return None
 
-    def _extract_dem_data(self) -> None:
+    def _extract_aux_data(self) -> None:
         """Extract data from DEMs and GSWOs"""
 
         logger.info("Extracting auxillary DEM and GSWO Data")
@@ -305,14 +458,15 @@ class FMask:
 
         self.dem_data = cast(DEMData, dem_data) if dem_data else None
 
-        gswo_data = extract_aux_data(
-            aux_path=self.gswo_path,
-            aux_type=AuxTypes.GSWO,
-            no_data=self.gswo_nodata,
-            **aux_data_kwargs,
-        )
+        if self.gswo_path:
+            gswo_data = extract_aux_data(
+                aux_path=self.gswo_path,
+                aux_type=AuxTypes.GSWO,
+                no_data=self.gswo_nodata,
+                **aux_data_kwargs,
+            )
 
-        self.gswo_data = cast(GSWOData, gswo_data) if gswo_data else None
+            self.gswo_data = cast(GSWOData, gswo_data) if gswo_data else None
 
         return None
 
@@ -333,18 +487,20 @@ class FMask:
 
         return None
 
-    def _create_temp_directory(self) -> Path:
+    def _create_temp_directory(self) -> None:
         """Create temporary directory"""
 
         temp_name: str = str(self.platform_data.scene_id) + "_temp"
-        outfile_path: Path = self.out_dir / temp_name
+        temp_dir: Path = self.out_dir / temp_name
 
-        if outfile_path.exists():
+        if temp_dir.exists():
             logger.debug("Outfile path exists, rewriting")
 
-        outfile_path.mkdir(exist_ok=True)
+        temp_dir.mkdir(exist_ok=True)
 
-        return outfile_path
+        self.temp_dir = temp_dir
+
+        return None
 
     def _run_cloud_detection(self) -> None:
         """Run cloud detection pipeline"""
@@ -482,22 +638,24 @@ class FMask:
         ##
         # Water
         ##
-        final_array = np.where(self.water > 0, 1, final_array)
+        final_array = np.where(self.water > 0, self.water_value, final_array)
 
         ##
         # Snow
         ##
-        final_array = np.where(self.snow > 0, 3, final_array)
+        final_array = np.where(self.snow > 0, self.snow_value, final_array)
 
         ##
         # Cloud Shadow
         ##
-        final_array = np.where(self.cloud_shadow > 0, 2, final_array)
+        final_array = np.where(
+            self.cloud_shadow > 0, self.cloud_shadow_value, final_array
+        )
 
         ##
         # Cloud
         ##
-        final_array = np.where(self.cloud > 0, 4, final_array)
+        final_array = np.where(self.cloud > 0, self.cloud_value, final_array)
 
         ##
         # No Data
@@ -508,8 +666,24 @@ class FMask:
 
         return None
 
-    def save_results(self) -> None:
-        """Save `self.final_array` to `self.outfile_path`"""
+    def save_results(self, save_cloud_prob: bool = None) -> None:
+        """Save `self.results` to `self.outfile_path`
+
+        Parameters
+        ----------
+
+        save_cloud_prob: bool
+            Bool to save cloud probability array with fmask results, default None
+            If given, overrides `self.save_cloud_prob` attribute
+        """
+
+        if self.results is None:
+            logger.error("You must execute `run()` method before saving results")
+            raise ValueError("You must execute `run()` method before saving results")
+
+        save_cloud_prob = (
+            save_cloud_prob if save_cloud_prob is not None else self.save_cloud_prob
+        )
 
         logger.info("Saving results")
 
@@ -525,7 +699,7 @@ class FMask:
         # [Optional] Save cloud probability
         ##
         logger.debug("Saving cloud probability %s", self.save_cloud_prob)
-        if self.save_cloud_prob:
+        if save_cloud_prob:
             cloud_probability: np.ndarray = np.where(
                 self.water == 1,
                 self.potential_clouds.over_water_probability,
@@ -557,7 +731,7 @@ class FMask:
         array: np.ndarray,
         file_path: str,
     ) -> None:
-        """Save `array` to `file_path` using `self` raster paramters"""
+        """Save `array` to `file_path` using `self.platform_info` raster parameters"""
 
         x_size: int = self.potential_clouds.cloud.shape[1]
         y_size: int = self.potential_clouds.cloud.shape[0]

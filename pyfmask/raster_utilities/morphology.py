@@ -108,6 +108,7 @@ def erode_commissons(
     )  # add clouds over water
 
     if cdi is None:
+        cloud = morphology.remove_small_objects(cloud.astype(bool), 3, connectivity=2)
         return cloud  # if not Sentinel-2
 
     ##

@@ -4,47 +4,63 @@ from pyfmask.main import FMask
 
 
 def app():
-    parser = ArgumentParser("PyFMask4.3 Landsat 8 and Sentinel-2")
+    parser = ArgumentParser("PyFMask Landsat 8 and Sentinel-2")
     parser.add_argument(
-        "infile", help="infile path to *_MTL.txt (L8) or MTD_TL.xml (S2) files"
+        "infile",
+        help=" Path to Sentinel-2 or Landast-8 file EX. {*._MTL.txt, MTD_*.xml}",
+        type=str,
     )
-    parser.add_argument("out_dir", help="output directory for fmask results")
-    parser.add_argument("out_name", help="output file name for fmask file")
+    parser.add_argument(
+        "out_dir",
+        help="Directory for program outputs EX. temporary folder, fmask results, probability masks",
+    )
+    parser.add_argument(
+        "--out_name",
+        help="Override default naming method `[self.platform_data.scene_id]_fmask`, default None",
+        type=str,
+        default=None,
+    )
     parser.add_argument(
         "--cloud",
-        help="Dilated number of pixels for cloud, default value of 3",
+        help="Number of cloud pixels to dilate, default 3",
         type=int,
         default=3,
     )
     parser.add_argument(
         "--shadow",
-        help="Dilated number of pixels for cloud shadow, default value of 3",
+        help="Number of cloud shadow pixels to dilate, default 3",
         type=int,
         default=3,
     )
     parser.add_argument(
         "--snow",
-        help="Dilated number of pixels for snow, default value of 0",
+        help="Number of snow pixels to dilate, default to 0",
         type=int,
         default=0,
     )
     parser.add_argument(
         "--save_cloud_prob",
-        help="Boolean whether to output cloud probability map",
+        help="Boolean whether to output cloud probability map, default of True",
         type=bool,
-        default=False,
+        default=True,
     ),
     parser.add_argument(
         "--use_mapzen",
-        help="Boolean to use Mapzen",
+        help="Bool to use Mapzen WMS DEM mapping, default True",
         type=bool,
         default=True,
     )
     parser.add_argument(
-        "--dem_path", help="Path to DEM where folder GTOPO30ZIP located"
+        "--dem_path",
+        help="Optional path to local DEM directory GTOPO30ZIP, default None",
+        type=str,
+        default=None,
     )
     parser.add_argument(
-        "--gswo_path", help="Path to GWSO where folder GSWO150ZIP located"
+        "--gswo_path",
+        help="Optional path to local GSWO directory GSWO150ZIP, default None",
+        type=str,
+        default=None,
     )
     args = parser.parse_args()
 

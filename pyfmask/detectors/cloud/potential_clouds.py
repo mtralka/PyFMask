@@ -101,7 +101,7 @@ def detect_potential_clouds(
     land_probability_brightness: Union[int, np.ndarray, float] = 1
 
     # if BT is available, use temperature probability
-    if bt is not None:
+    if bt is not None and dem is not None:
 
         bt_normalized_dem = normalize_bt(bt, dem, idused, low_percent, high_percent)
 
@@ -181,7 +181,7 @@ def detect_potential_clouds(
     ##
     # Handle extremely cold clouds
     ##
-    if bt is not None:
+    if bt is not None and dem is not None:
         id_final_cld = (id_final_cld == True) | (
             cast(np.ndarray, bt_normalized_dem) < (temp_test_low - 3500)
         )

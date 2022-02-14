@@ -67,10 +67,7 @@ def extract_aux_data(
             temp_dir,
         )
     else:
-        logger.error(
-            "`aux_path` must be given if not using `AuxType.MAPZEN`", stack_info=True
-        )
-        raise ValueError("`aux_path` must be given if not using `AuxType.MAPZEN`")
+        return None
 
     if ds is None:
         return None

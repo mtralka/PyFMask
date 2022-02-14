@@ -8,7 +8,7 @@ import numpy as np
 
 
 @dataclass
-class SensorData:
+class PlatformData:
     cloud_threshold: float
     probability_weight: float
     out_resolution: int

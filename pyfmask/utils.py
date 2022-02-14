@@ -1,8 +1,8 @@
-from typing import Union
 from pathlib import Path
+from typing import Union
 
 
-def valdiate_path(
+def validate_path(
     path: Union[str, Path],
     check_exists: bool = False,
     check_is_file: bool = False,
