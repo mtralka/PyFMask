@@ -104,8 +104,8 @@ class Landsat8(PlatformBase):
         file_band_names = cls._get_file_names(file_path)
 
         parameters["scene_id"] = file_band_names.pop(
-            "LANDSAT_PRODUCT_ID"
-        )  # file_path.parent.name
+            "LANDSAT_PRODUCT_ID", file_path.parent.name
+        )
         parameters["file_band_names"] = file_band_names
         parameters["sensor"] = "L08_OLI"  # SupportedSensors.L08_OLI
         parameters["sun_azimuth"] = float(calibration.pop("SUN_AZIMUTH"))
