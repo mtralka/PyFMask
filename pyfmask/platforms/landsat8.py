@@ -1,17 +1,21 @@
 from enum import Enum
-from importlib.metadata import metadata
 import logging.config
 from pathlib import Path
 from typing import Any
 from typing import Dict
 from typing import List
 from typing import Union
+
+import numpy as np
+from pyfmask.classes import PlatformData
+from pyfmask.extractors.metadata import extract_metadata
 from pyfmask.platforms.platform_base import PlatformBase
 
-import gdal
-import numpy as np
-from pyfmask.extractors.metadata import extract_metadata
-from pyfmask.classes import PlatformData
+try:
+    import gdal
+except ImportError:
+    from osgeo import gdal
+
 
 logger = logging.getLogger(__name__)
 

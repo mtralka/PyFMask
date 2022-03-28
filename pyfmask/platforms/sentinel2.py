@@ -6,11 +6,15 @@ from typing import Dict
 from typing import Union
 from skimage.measure import block_reduce
 
-import gdal
 import numpy as np
 from pyfmask.extractors.metadata import extract_metadata
 from pyfmask.platforms.platform_base import PlatformBase
 from pyfmask.classes import PlatformData
+
+try:
+    import gdal
+except ImportError:
+    from osgeo import gdal
 
 
 logger = logging.getLogger(__name__)

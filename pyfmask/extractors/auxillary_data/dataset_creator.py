@@ -1,21 +1,23 @@
 import logging.config
 from pathlib import Path
 from types import FunctionType
-from typing import Any
-from typing import Dict
 from typing import Final
 from typing import List
 from typing import Union
 from importlib import resources
 
-
-import gdal
-import osr
 from pyfmask.extractors.auxillary_data.name_extractor import get_gswo_names
 from pyfmask.extractors.auxillary_data.name_extractor import get_topo30_names
 from pyfmask.extractors.auxillary_data.types import AuxTypes
 from pyfmask.extractors.auxillary_data.types import BoundingBox
 from pyfmask.extractors.auxillary_data.types import Coordinate
+
+try:
+    import gdal
+    import osr
+except ImportError:
+    from osgeo import gdal
+    from osgeo import osr
 
 
 RESAMPLING_METHOD: Final[str] = "bilinear"

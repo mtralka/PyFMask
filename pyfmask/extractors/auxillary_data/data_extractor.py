@@ -1,5 +1,4 @@
 import logging.config
-from multiprocessing.sharedctypes import Value
 from pathlib import Path
 from types import FunctionType
 from typing import Any
@@ -8,15 +7,19 @@ from typing import Optional
 from typing import Union
 from typing import cast
 
-import gdal
 import numpy as np
-import osr
 from pyfmask.extractors.auxillary_data.dataset_creator import create_local_aux_dataset
 from pyfmask.extractors.auxillary_data.dataset_creator import create_mapzen_dataset
 from pyfmask.extractors.auxillary_data.types import AuxTypes
 from pyfmask.classes import DEMData
 from pyfmask.classes import GSWOData
 
+try:
+    import gdal
+    import osr
+except ImportError:
+    from osgeo import gdal
+    from osgeo import osr
 
 logger = logging.getLogger(__name__)
 

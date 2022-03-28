@@ -2,7 +2,6 @@ from typing import Optional
 from typing import Tuple
 
 import numpy as np
-from pyfmask.detectors.cloud_shadow.match_cloud_shadows import shadow
 from pyfmask.classes import DEMData
 from pyfmask.classes import PlatformData
 from skimage import morphology

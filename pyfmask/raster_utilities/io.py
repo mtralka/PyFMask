@@ -1,8 +1,15 @@
 from typing import Union
-import gdal
-import gdalconst
-from osgeo.gdal import Dataset
+
 import numpy as np
+
+try:
+    import gdal
+    import gdalconst
+    from gdal import Dataset
+except ImportError:
+    from osgeo import gdalconst
+    from osgeo import gdal
+    from osgeo.gdal import Dataset
 
 
 def create_outfile_dataset(

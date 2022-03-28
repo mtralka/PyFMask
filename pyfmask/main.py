@@ -10,7 +10,6 @@ from typing import Optional
 from typing import Union
 from typing import cast
 
-import gdalconst
 import numpy as np
 
 from pyfmask.classes import DEMData
@@ -40,6 +39,11 @@ from pyfmask.raster_utilities.morphology import dilate_array
 from pyfmask.raster_utilities.morphology import enhance_line
 from pyfmask.raster_utilities.morphology import erode_commissons
 from pyfmask.utils import validate_path
+
+try:
+    import gdalconst
+except ImportError:
+    from osgeo import gdalconst
 
 
 with resources.path("pyfmask", "loggingConfig.json") as p:
@@ -72,7 +76,7 @@ class FMask:
     `infile` : Union[Path, str]
         Path to Sentinel-2 or Landast-8 file EX. {*._MTL.txt, MTD_*.xml}
     `out_dir`: Union[Path, str]
-        Directory for program outputs EX. temporary folder, fmask results, probability masks
+        Directory for program outputs (temporary folder, fmask results, probability masks)
     `out_name`: Optional[str]
         Override default naming method `{self.platform_data.scene_id}_fmask`, default None
     `gswo_path`: Optional[Union[Path, str]]
@@ -446,7 +450,7 @@ class FMask:
         if (
             not dem_data
             and initial_dem_type is AuxTypes.MAPZEN
-            and self.dem_data is not None
+            and self.dem_path is not None
         ):
             logger.info("Failed Mapzen, using local DEM")
             dem_data = extract_aux_data(

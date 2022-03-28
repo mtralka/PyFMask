@@ -2,9 +2,19 @@
 
 The definitive Python implementation of FMask 4.3 for Landsat 8 and Sentinel 2. Uses Mapzen DEM WMS for improved detection. Can also use local DEM and GSWO files.
 
+## Default Result Values
+
+| **Item**     | **Value** |
+|--------------|-----------|
+| Water        | 1         |
+| Cloud Shadow | 2         |
+| Snow         | 3         |
+| Cloud        | 4         |
+| No Data      | 255       |
+
 ## Installation
 
-This program uses `poetry` for package management. Note, `GDAL` **is** required but not listed in the `pyproject.toml` due to build limitations on pypi. `GDAL` must be installed in the runtime environment.
+This program uses `poetry` for package management. Note, `GDAL` **is** required but not listed in the `pyproject.toml`. `GDAL` must be installed in the runtime environment.
 
 ### Build and install from source
 
@@ -26,7 +36,7 @@ The `pyfmask` script configured within poetry allows for simple CLI access witho
 
 ### Install from pre-built '.whl'
 
-Although this package is not listed on PyPi due to project restrictions, we can achieve the same function result from distributing the project `.whl`s and installing locally through pip/pipx/etc.
+We can achieve the same function result from distributing the project `.whl`s and installing locally through pip/pipx/etc.
 
 - `pip install path/to/.whl`
 
@@ -45,7 +55,7 @@ pyfmask [ARGS]
 ```
 
 <p align="center">
-    <img src="github/cli_example.PNG" alt="PyFMask CLI example">
+    <img src="github/cli_example.png" alt="PyFMask CLI example">
 </p>
 
 ### Object
@@ -59,7 +69,7 @@ outfile_dir: str = "path/to/outfile/dir"
 control = FMask(infile=infile, out_dir=outfile_dir, auto_save=True, auto_run=True)
 ```
 
-## FMask Object Docstring
+#### FMask Object Docstring
 
 Control object for FMask operations
 
@@ -83,7 +93,7 @@ Attributes
 `infile` : Union[Path, str]
     Path to Sentinel-2 or Landast-8 file EX. {*._MTL.txt, MTD_*.xml}
 `out_dir`: Union[Path, str]
-    Directory for program outputs EX. temporary folder, fmask results, probability masks
+    Directory for program outputs (temporary folder, fmask results, probability masks)
 `out_name`: Optional[str]
     Override default naming method `{self.platform_data.scene_id}_fmask`, default None
 `gswo_path`: Optional[Union[Path, str]]
@@ -174,3 +184,9 @@ Example
 >>> controller = FMask(infile=infile, out_dir=out_dir, delete_temp_dir=False,
     out_name=out_file_name, auto_run=True, auto_save=True)
 ```
+
+## Contributing
+
+- Code style is `black` with `mypy` type checking
+- Use the configured pre-commit hooks
+  - install with `pre-commit install`
