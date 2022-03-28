@@ -1,0 +1,38 @@
+[tool.poetry]
+name = "pyfmask"
+version = "1.0.0"
+description = "The definitive Python implementation of FMask 4.3 for Landsat 8 and Sentinel 2 "
+authors = ["mtralka <mtralka@umd.edu>"]
+keywords = ["remote sensing", "cloud detection", "fmask"]
+include = ["pyfmask/loggingConfig.json", "pyfmask/extractors/mapzen_wms.xml"]
+
+classifiers = [
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Education",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3.8",
+]
+
+[tool.poetry.dependencies]
+python = "^3.8, <3.11"
+numpy = "^1.21.4"
+scipy = "^1.7.2"
+statsmodels = "^0.13.1"
+scikit-image = "^0.19.1"
+
+[tool.poetry.dev-dependencies]
+black = "^21.10b0"
+mypy = "^0.910"
+notebook = "^6.4.5"
+pre-commit = "^2.15.0"
+
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[mypy]
+ignore_missing_imports = true
+
+[tool.poetry.scripts]
+pyfmask = 'pyfmask.cli:app'
